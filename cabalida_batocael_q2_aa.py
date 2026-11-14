@@ -12,7 +12,7 @@
 # - View all attendance events by timestamp using Merge Sort.
 # - View one student's events chronologically using Merge Sort.
 # - View today's events by time using Insertion Sort.
-# - Estimate current presence from each student's latest event in this session.
+# - View each student's latest recorded campus status from this session.
 # Student details include intern/extern residence type and intern subtype; these
 # are descriptive and do not restrict or validate a student's movements.
 # IDs: id_qr is the student's prototype QR payload; id_no is 16-YYYY-NNN.
@@ -29,8 +29,8 @@
 # information describes the student but does not impose a schedule, since interns
 # and externs may make multiple trips or leave at different times.
 # The sorting functions are implemented in this file rather than using Python's
-# built-in sorting functions. The presence view is only an estimate from events
-# entered during the current run. Data is temporary, and guardian notifications
+# built-in sorting functions. The status view reflects only events entered during
+# the current run. Data is temporary, and guardian notifications
 # are displayed for the prototype but are not sent by SMS or email.
 
 # Developers:
@@ -242,14 +242,14 @@ def register_student():
     )
     student_records.append(student)
     print("\nStudent registered successfully.")
-    print(f"Student number (id_no): {student.id_no}")
-    print(f"Student ID / QR payload (id_qr): {student.id_qr}")
+    print(f"Student number: {student.id_no}")
+    print(f"Student QR ID: {student.id_qr}")
 
 
 def print_student(student):
     print("." * 68)
-    print(f"Student number (id_no): {student.id_no}")
-    print(f"Student ID / QR payload (id_qr): {student.id_qr}")
+    print(f"Student number: {student.id_no}")
+    print(f"Student QR ID: {student.id_qr}")
     print(f"Name: {student.full_name}")
     print(f"Batch/grade: {student.grade_level} | Section: {student.section}")
     print(f"Birthday: {student.birthday}")
@@ -333,7 +333,7 @@ def display_student_list(students, title):
 
 def view_students_by_class():
     ordered = insertion_sort(student_records, student_class_key)
-    display_student_list(ordered, "Students by grade, section, and name (Insertion Sort)")
+    display_student_list(ordered, "Student Directory: By Grade, Section, and Name")
 
 
 def linear_search_students(keyword):
@@ -353,7 +353,7 @@ def linear_search_students(keyword):
 
 def search_students():
     display_section_header("Student Record Finder")
-    print("Search by id_qr, id_no, name, batch/grade, section, or residence.")
+    print("Search by student number, QR ID, name, grade, section, or residence.")
     keyword = get_non_empty_input("Search term: ")
     matches = linear_search_students(keyword)
     if not matches:
@@ -367,7 +367,7 @@ def search_students():
 
 def view_students_by_id_no():
     ordered = selection_sort(student_records, student_number_key)
-    display_student_list(ordered, "Students by id_no (Selection Sort)")
+    display_student_list(ordered, "Student Directory: By Student Number")
 
 
 def build_notification(student, event_type, timestamp):
@@ -375,9 +375,9 @@ def build_notification(student, event_type, timestamp):
         f"Hello po, Ma'am/Sir {student.guardian_name}!\n\n"
         "This is a school guard-house notification.\n"
         f"Student: {student.full_name}\n"
-        f"Student number (id_no): {student.id_no}\n"
+        f"Student number: {student.id_no}\n"
         f"Residence: {student.residence_type} ({student.intern_subtype})\n"
-        f"Event: Student {event_type.lower()}\n"
+        f"Event: {describe_movement(event_type)}\n"
         f"Date and time: {timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}\n\n"
         "The campus record has been updated. Thank you po!"
     )
@@ -385,17 +385,22 @@ def build_notification(student, event_type, timestamp):
 
 def record_entry_or_exit():
     display_section_header("Record Student Entry or Exit")
-    value = get_non_empty_input("Scan/type the student's id_qr payload: ")
+    value = get_non_empty_input("Student number or QR ID: ")
     student = campus_system.find_student_by_id(value)
     if student is None:
-        print("No matching student. Check the QR payload or use id_no instead.")
+        print("Student not found. Check the student number or QR ID.")
         return
     while True:
-        choice = input("Type E for Entry or X for Exit: ").strip().upper()
-        if choice in {"E", "X"}:
+        choice = input(
+            "Select movement: [1] Arriving on campus  [2] Leaving campus  [B] Cancel: "
+        ).strip().upper()
+        if choice in {"1", "2", "B"}:
             break
-        print("Enter E for Entry or X for Exit.")
-    event_type = "ENTRY" if choice == "E" else "EXIT"
+        print("Choose 1, 2, or B to cancel.")
+    if choice == "B":
+        print("No event was recorded.")
+        return
+    event_type = "ENTRY" if choice == "1" else "EXIT"
     timestamp = datetime.now()
     notification = build_notification(student, event_type, timestamp)
     record = AttendanceRecord(
@@ -406,25 +411,29 @@ def record_entry_or_exit():
     )
     attendance_records.append(record)
     print("\nEvent recorded.")
-    print(f"{record.student_name} | {record.id_no} | {record.event_type}")
+    print(f"{record.student_name} | {record.id_no} | {describe_movement(record.event_type)}")
     print(timestamp.strftime("%Y-%m-%d %I:%M:%S %p"))
     if get_yes_or_no("Display the simulated guardian message now? (Y/N): ") == "Y":
         display_parent_message(record)
 
 
+def describe_movement(event_type):
+    return "Arrived on campus" if event_type == "ENTRY" else "Left campus"
+
+
 def print_attendance_record(record):
     print("." * 68)
     print(f"Record ID: {record.record_id}")
-    print(f"Student: {record.student_name} | id_no: {record.id_no}")
-    print(f"id_qr: {record.id_qr}")
+    print(f"Student: {record.student_name} | Student number: {record.id_no}")
+    print(f"Student QR ID: {record.id_qr}")
     print(f"Batch/grade: {record.grade_level} | Section: {record.section}")
     print(f"Residence: {record.residence_type} | Type: {record.intern_subtype}")
-    print(f"Event: {record.event_type}")
+    print(f"Movement: {describe_movement(record.event_type)}")
     print(f"Date/time: {record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
 
 
-def display_attendance_list(records, title, algorithm_name):
-    display_section_header(f"{title} ({algorithm_name})")
+def display_attendance_list(records, title):
+    display_section_header(title)
     if not records:
         print("No attendance events to display.")
         return
@@ -436,7 +445,7 @@ def display_attendance_list(records, title, algorithm_name):
 
 def view_all_events_chronologically():
     ordered = merge_sort(attendance_records, timestamp_key)
-    display_attendance_list(ordered, "All Attendance Events by Date and Time", "Merge Sort")
+    display_attendance_list(ordered, "All Recorded Events, in Date and Time Order")
 
 
 def view_todays_events():
@@ -444,26 +453,26 @@ def view_todays_events():
     todays_records = [record for record in attendance_records
                       if record.timestamp.date() == today]
     ordered = insertion_sort(todays_records, timestamp_key)
-    display_attendance_list(ordered, "Today's Attendance Events", "Insertion Sort")
+    display_attendance_list(ordered, "Today's Entry and Exit Activity")
 
 
 def view_student_history():
     display_section_header("Student Attendance History")
-    student = get_student_by_lookup("Enter id_no or id_qr: ")
+    student = get_student_by_lookup("Student number or QR ID: ")
     if student is None:
         return
     history = [record for record in attendance_records if record.id_qr == student.id_qr]
     ordered = merge_sort(history, timestamp_key)
     print(f"History for {student.full_name} ({student.id_no})")
     print("Residence type is descriptive only; no travel rules are enforced.")
-    display_attendance_list(ordered, "Student Events in Date/Time Order", "Merge Sort")
+    display_attendance_list(ordered, "Student Events, in Date and Time Order")
 
 
 def display_parent_message(record):
     display_section_header("Simulated Parent/Guardian Message")
     print(f"Recipient: Parent/guardian of {record.student_name}")
     print(f"Guardian contact: {record.guardian_contact}")
-    print(f"Related record ID: {record.record_id}")
+    print(f"Event number: {record.record_id}")
     print("." * 68)
     print(record.notification)
     print("." * 68)
@@ -475,11 +484,11 @@ def view_parent_message():
         print("There are no recorded messages yet.")
         return
     for record in attendance_records:
-        print(f"[{record.record_id}] {record.student_name} - {record.event_type} - "
+        print(f"[{record.record_id}] {record.student_name} - {describe_movement(record.event_type)} - "
               f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
-    record_id = get_non_empty_input("Recording ID to view: ")
+    record_id = get_non_empty_input("Event number to open: ")
     if not record_id.isdigit():
-        print("Enter a numeric recording ID.")
+        print("Enter one of the event numbers shown above.")
         return
     for record in attendance_records:
         if record.record_id == int(record_id):
@@ -501,59 +510,110 @@ def display_daily_summary():
     print(f"Exits: {exits}")
 
 
-def view_current_presence_estimate():
-    """Infer a session-only status from each student's latest recorded event."""
+def view_latest_recorded_status():
+    """Show what each student's latest recorded entry or exit indicates."""
     latest_by_id_qr = {}
     for record in attendance_records:
         previous = latest_by_id_qr.get(record.id_qr)
         if previous is None or record.timestamp > previous.timestamp:
             latest_by_id_qr[record.id_qr] = record
-    students_with_events = [
-        student for student in student_records if student.id_qr in latest_by_id_qr
-    ]
-    ordered = insertion_sort(students_with_events, student_class_key)
-    display_section_header("Estimated Current Campus Presence")
-    print("Estimate from the latest event recorded in this running session only.")
-    print("It is not a live or persistent attendance register.")
-    if not ordered:
-        print("No student has a recorded event in this session.")
+
+    ordered_students = insertion_sort(student_records, student_class_key)
+    display_section_header("Latest Recorded Campus Status")
+    print("Based on each student's latest event recorded since this program started.")
+    print("Latest ENTRY means recorded as on campus. Latest EXIT means recorded as off campus.")
+    print("No event this session means the status is unknown. This is not a live location check.")
+    print("Event records are cleared when the program closes.")
+    if not ordered_students:
+        print("No students are registered.")
         return
-    for student in ordered:
-        latest = latest_by_id_qr[student.id_qr]
-        status = "PRESUMED ON CAMPUS" if latest.event_type == "ENTRY" else "PRESUMED OFF CAMPUS"
-        print(f"{student.id_no} | {student.full_name} | {student.grade_level}-{student.section}")
-        print(f"{status} based on latest {latest.event_type} at "
-              f"{latest.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
+
+    for student in ordered_students:
+        latest = latest_by_id_qr.get(student.id_qr)
+        print("." * 68)
+        print(f"{student.id_no} | {student.full_name} | "
+              f"Grade {student.grade_level}, {student.section}")
+        if latest is None:
+            print("Status: UNKNOWN. No entry or exit has been recorded this session.")
+        else:
+            status = "Recorded as on campus" if latest.event_type == "ENTRY" else "Recorded as off campus"
+            print(f"Status: {status}")
+            print(f"Latest event: {latest.event_type} at "
+                  f"{latest.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
 
 
-def display_menu():
+def get_menu_choice(prompt, valid_choices):
+    while True:
+        choice = input(prompt).strip()
+        if choice in valid_choices:
+            return choice
+        print("That choice is not on this menu. Please try again.")
+
+
+def display_main_menu():
     print("\n" + "=" * 72)
     print("MAIN MENU")
     print("=" * 72)
-    print("[1] Register student")
-    print("[2] View students by grade, section, and name (Insertion Sort)")
-    print("[3] Find student; search results ordered by class (Linear + Insertion)")
-    print("[4] Update student details")
-    print("[5] Remove student")
-    print("[6] Record student entry/exit")
-    print("[7] View all events by date/time (Merge Sort)")
-    print("[8] View today's events by time (Insertion Sort)")
-    print("[9] View a student's chronological event history (Merge Sort)")
-    print("[10] View students by id_no (Selection Sort)")
-    print("[11] Estimate current presence from latest recorded event")
-    print("[12] View simulated guardian message")
-    print("[13] Daily summary")
-    print("[14] Exit")
+    print("[1] Register a student")
+    print("[2] Find a student")
+    print("[3] Student records")
+    print("[4] Record an entry or exit")
+    print("[5] Attendance and reports")
+    print("[6] Guardian messages")
+    print("[7] Exit")
+    return get_menu_choice("Choose an option (1-7): ", {str(i) for i in range(1, 8)})
+
+
+def run_student_records_menu():
+    actions = {"1": view_students_by_class, "2": view_students_by_id_no,
+               "3": update_student, "4": remove_student}
     while True:
-        choice = input("Menu choice (1-14): ").strip()
-        if choice in {str(number) for number in range(1, 15)}:
-            return choice
-        print("Enter a number from 1 through 14.")
+        display_section_header("Student Records")
+        print("[1] Browse students by grade and section")
+        print("[2] Browse students by student number")
+        print("[3] Update a student record")
+        print("[4] Remove a student record")
+        print("[5] Back to main menu")
+        choice = get_menu_choice("Choose an option (1-5): ", {"1", "2", "3", "4", "5"})
+        if choice == "5":
+            return
+        actions[choice]()
+
+
+def run_attendance_menu():
+    actions = {"1": view_todays_events,
+               "2": view_all_events_chronologically,
+               "3": view_student_history,
+               "4": display_daily_summary,
+               "5": view_latest_recorded_status}
+    while True:
+        display_section_header("Attendance and Reports")
+        print("[1] Today's entry and exit activity")
+        print("[2] Browse all recorded events")
+        print("[3] View one student's event history")
+        print("[4] Today's entry/exit summary")
+        print("[5] View latest recorded campus status")
+        print("[6] Back to main menu")
+        choice = get_menu_choice("Choose an option (1-6): ", {str(i) for i in range(1, 7)})
+        if choice == "6":
+            return
+        actions[choice]()
+
+
+def run_guardian_messages_menu():
+    while True:
+        display_section_header("Guardian Messages")
+        print("[1] View a message for a recorded event")
+        print("[2] Back to main menu")
+        choice = get_menu_choice("Choose an option (1-2): ", {"1", "2"})
+        if choice == "2":
+            return
+        view_parent_message()
 
 
 def update_student():
     display_section_header("Update Student")
-    student = get_student_by_lookup("Student id_no or id_qr to update: ")
+    student = get_student_by_lookup("Student number or QR ID to update: ")
     if student is None:
         return
     print("Press Enter to keep each current value.")
@@ -609,7 +669,7 @@ def update_student():
 
 def remove_student():
     display_section_header("Remove Student")
-    student = get_student_by_lookup("Student id_no or id_qr to remove: ")
+    student = get_student_by_lookup("Student number or QR ID to remove: ")
     if student is None:
         return
     print_student(student)
@@ -622,24 +682,12 @@ def remove_student():
 
 def run_program():
     display_program_header()
-    actions = {
-        "1": register_student,
-        "2": view_students_by_class,
-        "3": search_students,
-        "4": update_student,
-        "5": remove_student,
-        "6": record_entry_or_exit,
-        "7": view_all_events_chronologically,
-        "8": view_todays_events,
-        "9": view_student_history,
-        "10": view_students_by_id_no,
-        "11": view_current_presence_estimate,
-        "12": view_parent_message,
-        "13": display_daily_summary,
-    }
+    actions = {"1": register_student, "2": search_students,
+               "3": run_student_records_menu, "4": record_entry_or_exit,
+               "5": run_attendance_menu, "6": run_guardian_messages_menu}
     while True:
-        choice = display_menu()
-        if choice == "14":
+        choice = display_main_menu()
+        if choice == "7":
             print("\nThank you for using the campus recording system.")
             break
         actions[choice]()
