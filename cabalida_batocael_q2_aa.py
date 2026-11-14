@@ -1,10 +1,41 @@
+# -------- DOCUMENTATION --------
 # PSHS-ZRC Student Entrance and Exit Recording System
-# Q2 Alternative Assessment program
-# This terminal prototype records student registrations and campus entry/exit events.
-# It uses Linear Search, Insertion Sort, Selection Sort, and Merge Sort implemented
-# directly in this file. It does not use Python's built-in sorting functions.
-# Student identifiers: id_qr is a prototype QR payload; id_no is 16-YYYY-NNN.
-# All records are held in memory and disappear when the program closes.
+# Problem Fixed: Organizes student registration and campus entry/exit records.
+# Goal: Help guards, teachers, and dorm managers record and review student presence.
+# Target users: School guards and authorized school staff.
+# Features: Register, view, search, update, and remove students; record entry and
+# exit events; view simulated guardian messages and daily entry/exit summaries.
+# Sorting and searching features:
+# - View students by grade, section, and name using Insertion Sort.
+# - Find students using Linear Search, then order matches by class with Insertion Sort.
+# - View students by id_no using Selection Sort.
+# - View all attendance events by timestamp using Merge Sort.
+# - View one student's events chronologically using Merge Sort.
+# - View today's events by time using Insertion Sort.
+# - Estimate current presence from each student's latest event in this session.
+# Student details include intern/extern residence type and intern subtype; these
+# are descriptive and do not restrict or validate a student's movements.
+# IDs: id_qr is the student's prototype QR payload; id_no is 16-YYYY-NNN.
+# Capacity: Up to 540 students, 30 students per section, and 3 sections per grade.
+# Python concepts: Classes, objects, lists, functions, loops, conditions, input
+# validation, Linear Search, Insertion Sort, Selection Sort, and Merge Sort.
+
+# -------- EXPLANATION --------
+# The program is a terminal-based prototype for recording student registrations
+# and each campus entry or exit as a separate timestamped attendance event.
+# id_qr is the text payload representing the student's QR-based ID; id_no is a
+# separate student number with the freshman-entry year and a three-digit sequence.
+# The user types the QR payload in place of scanning a physical QR card. Residence
+# information describes the student but does not impose a schedule, since interns
+# and externs may make multiple trips or leave at different times.
+# The sorting functions are implemented in this file rather than using Python's
+# built-in sorting functions. The presence view is only an estimate from events
+# entered during the current run. Data is temporary, and guardian notifications
+# are displayed for the prototype but are not sent by SMS or email.
+
+# Developers:
+# John Edgar A. Cabalida, 11 - Polaris
+# Shan Fernan Emiel F. Batocael, 11 - Sirius
 
 from datetime import datetime
 
