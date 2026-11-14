@@ -4,6 +4,7 @@
 # Problem Fixed: Organizes student registration and campus entry/exit records.
 # Target users: School guards and authorized school staff.
 # Features: Register, view, search, update, remove, record entry/exit, view parent messages, and display a daily summary.
+# IDs: A generated QR payload is the student ID; student number is separate (16-YYYY-NNN).
 # Python concepts: Classes, objects, lists, functions, loops, conditions, string methods, input validation, and formatted output.
  
 # -------- EXPLANATION --------
@@ -20,8 +21,10 @@
 # chooses entry or exit, and the program timestamps the event. The event object
 # is added to the attendance list. The system displays a friendly message, but
 # does not send a real text or email. Input checks help reject blank values,
-# malformed QR codes, duplicate QR codes, and invalid menu choices. All data is
+# invalid freshman-entry years, and invalid menu choices. All data is
 # temporary and is lost when the program closes.
+# Each student has a generated QR payload as their student ID and a separate
+# student number: 16-YYYY-NNN, where YYYY is their freshman-entry year.
 
 # ADDITIONAL: This program serves as a "prototype" for a planned future project for this sytem, with implementation IRL.
 
@@ -33,14 +36,15 @@ from datetime import datetime
 
 # Object models and manager used by the menu functions.
 class Student:
-    def __init__(self, student_id, full_name, grade_section, birthday,
-                 contact_number, qr_code, guardian_name, guardian_contact):
+    def __init__(self, student_id, student_number, full_name, grade_section, birthday,
+                 contact_number, guardian_name, guardian_contact):
+        # student_id is the string payload represented by the student QR code.
         self.student_id = student_id
+        self.student_number = student_number
         self.full_name = full_name
         self.grade_section = grade_section
         self.birthday = birthday
         self.contact_number = contact_number
-        self.qr_code = qr_code
         self.guardian_name = guardian_name
         self.guardian_contact = guardian_contact
 
@@ -54,11 +58,12 @@ class Student:
 
 
 class AttendanceRecord:
-    def __init__(self, record_id, student_id, student_name, grade_section,
+    def __init__(self, record_id, student_id, student_number, student_name, grade_section,
                  guardian_name, guardian_contact, event_type, event_date,
                  event_time, notification):
         self.record_id = record_id
         self.student_id = student_id
+        self.student_number = student_number
         self.student_name = student_name
         self.grade_section = grade_section
         self.guardian_name = guardian_name
@@ -77,8 +82,15 @@ class CampusSystem:
         self.student_records = []
         self.attendance_records = []
 
-    def create_next_student_id(self):
-        return f"S{len(self.student_records) + 1:03d}"
+    def create_next_student_number(self, freshman_year):
+        highest_sequence = 0
+        for student in self.student_records:
+            parts = student.student_number.split("-")
+            if len(parts) == 3 and parts[1] == freshman_year:
+                highest_sequence = max(highest_sequence, int(parts[2]))
+        if highest_sequence >= 999:
+            raise ValueError("The student-number sequence for this year is full.")
+        return f"16-{freshman_year}-{highest_sequence + 1:03d}"
 
     def find_student_by_id(self, student_id):
         for student in self.student_records:
@@ -87,10 +99,8 @@ class CampusSystem:
         return None
 
     def find_student_by_qr_code(self, qr_code):
-        for student in self.student_records:
-            if student.qr_code.lower() == qr_code.lower():
-                return student
-        return None
+        # The QR code payload is the student's ID itself.
+        return self.find_student_by_id(qr_code)
 
 
 # Keep the original collection names so the existing functions remain intact.
@@ -131,35 +141,21 @@ def get_yes_or_no(prompt):
             return answer
         print("Please type Y for Yes or N for No.")
 
-# Checks the required 16-XXXX-ZZZ numeric QR code format.
-def is_valid_qr_code(qr_code):
-    parts = qr_code.split("-")
+# Checks that the freshman-entry year has exactly four digits.
+def is_valid_freshman_year(year):
+    return len(year) == 4 and year.isdigit()
 
-    if len(parts) != 3:
-        return False
-    if parts[0] != "16":
-        return False
-    if len(parts[1]) != 4 or len(parts[2]) != 3:
-        return False
-    if not parts[1].isdigit() or not parts[2].isdigit():
-        return False
-
-    return True
-
-# Gets a unique QR code in the required format.
-def get_valid_qr_code():
+# Gets the freshman-entry year used in the separate student number.
+def get_freshman_year():
     while True:
-        qr_code = input("ID QR code (format: 16-XXXX-ZZZ): ").strip().upper()
+        year = input("Year the student entered as a freshman (YYYY): ").strip()
+        if is_valid_freshman_year(year):
+            return year
+        print("Enter a four-digit year, such as 2026.")
 
-        if not is_valid_qr_code(qr_code):
-            print("Invalid format. Use 16-XXXX-ZZZ, such as 16-1234-567.")
-            continue
-
-        if find_student_by_qr_code(qr_code) is not None:
-            print("That QR code is already registered.")
-            continue
-
-        return qr_code
+# Creates a prototype QR payload; this string is the student's ID.
+def create_qr_code_value(student_number):
+    return f"PSHS-ZRC-STUDENT-{student_number}"
 
 # Shows a clear heading for the selected screen.
 def display_section_header(title):
@@ -167,9 +163,9 @@ def display_section_header(title):
     print(f"                 {title.upper()}")
     print("-" * 58)
 
-# Creates the next simple student ID.
-def create_next_student_id():
-    return campus_system.create_next_student_id()
+# Creates the next student number for the freshman-entry year.
+def create_next_student_number(freshman_year):
+    return campus_system.create_next_student_number(freshman_year)
 
 # Finds one student by student ID.
 def find_student_by_id(student_id):
@@ -188,17 +184,19 @@ def register_student():
     grade_section = get_non_empty_input("Grade and section: ")
     birthday = get_non_empty_input("Birthday (YYYY-MM-DD): ")
     contact_number = get_valid_contact("Student contact number: ")
-    qr_code = get_valid_qr_code()
+    freshman_year = get_freshman_year()
+    student_number = create_next_student_number(freshman_year)
+    qr_code = create_qr_code_value(student_number)
     guardian_name = get_non_empty_input("Parent/guardian full name: ")
     guardian_contact = get_valid_contact("Parent/guardian contact number: ")
 
     new_student = Student(
-        student_id=create_next_student_id(),
+        student_id=qr_code,
+        student_number=student_number,
         full_name=full_name,
         grade_section=grade_section,
         birthday=birthday,
         contact_number=contact_number,
-        qr_code=qr_code,
         guardian_name=guardian_name,
         guardian_contact=guardian_contact,
     )
@@ -206,17 +204,18 @@ def register_student():
     student_records.append(new_student)
 
     print("\nStudent registered successfully.")
-    print(f"Student ID: {new_student['student_id']}")
+    print(f"Student ID / QR payload: {new_student['student_id']}")
+    print(f"Student number: {new_student['student_number']}")
 
 # Displays one student record.
 def display_student(student):
     print("." * 44)
-    print(f"Student ID: {student['student_id']}")
+    print(f"Student ID / QR payload: {student['student_id']}")
+    print(f"Student number: {student['student_number']}")
     print(f"Full name: {student['full_name']}")
     print(f"Grade/section: {student['grade_section']}")
     print(f"Birthday: {student['birthday']}")
     print(f"Student contact: {student['contact_number']}")
-    print(f"QR code: {student['qr_code']}")
     print(f"Parent/guardian: {student['guardian_name']}")
     print(f"Guardian contact: {student['guardian_contact']}")
 
@@ -236,16 +235,16 @@ def display_all_students():
 # Searches students using a keyword.
 def search_student():
     display_section_header("Search Student")
-    print("Search by student ID, name, grade/section, or QR code.")
+    print("Search by student ID/QR payload, student number, name, or grade/section.")
     keyword = get_non_empty_input("Search keyword: ").lower()
     matches = []
 
     for student in student_records:
         searchable_text = (
             student["student_id"] + " "
+            + student["student_number"] + " "
             + student["full_name"] + " "
-            + student["grade_section"] + " "
-            + student["qr_code"]
+            + student["grade_section"]
         ).lower()
 
         if keyword in searchable_text:
@@ -262,7 +261,7 @@ def search_student():
 # Updates selected fields in a student record.
 def update_student():
     display_section_header("Update Student")
-    student_id = get_non_empty_input("Student ID to update: ")
+    student_id = get_non_empty_input("Student ID / QR payload to update: ")
     student = find_student_by_id(student_id)
 
     if student is None:
@@ -311,7 +310,7 @@ def update_student():
 # Removes a student after confirmation.
 def remove_student():
     display_section_header("Remove Student")
-    student_id = get_non_empty_input("Student ID to remove: ")
+    student_id = get_non_empty_input("Student ID / QR payload to remove: ")
     student = find_student_by_id(student_id)
 
     if student is None:
@@ -333,6 +332,7 @@ def build_notification(student, event_type, event_date, event_time):
         f"Hello po, Ma'am/Sir {student['guardian_name']}!\n\n"
         f"This is a school guard-house notification.\n"
         f"Student name: {student['full_name']}\n"
+        f"Student number: {student['student_number']}\n"
         f"Grade/section: {student['grade_section']}\n"
         f"Event: Student {event_type.lower()}\n"
         f"Date: {event_date}\n"
@@ -356,7 +356,7 @@ def display_parent_message(record):
 def record_entry_or_exit():
     display_section_header("Record Student Entry or Exit")
     print("Type the registered QR code, then choose Entry or Exit.")
-    qr_code = get_non_empty_input("Student QR code (format: 16-XXXX-ZZZ): ").upper()
+    qr_code = get_non_empty_input("Student ID / QR payload: ").upper()
     student = find_student_by_qr_code(qr_code)
 
     if student is None:
@@ -380,6 +380,7 @@ def record_entry_or_exit():
     new_record = AttendanceRecord(
         record_id=len(attendance_records) + 1,
         student_id=student["student_id"],
+        student_number=student["student_number"],
         student_name=student["full_name"],
         grade_section=student["grade_section"],
         guardian_name=student["guardian_name"],
@@ -394,6 +395,7 @@ def record_entry_or_exit():
 
     print("\nRecord saved successfully.")
     print(f"Student: {new_record['student_name']}")
+    print(f"Student number: {new_record['student_number']}")
     print(f"Grade/section: {new_record['grade_section']}")
     print(f"Event: {new_record['event_type']}")
     print(f"Date and time: {event_date} {event_time}")
@@ -409,6 +411,7 @@ def display_attendance_record(record):
     print("." * 44)
     print(f"Record ID: {record['record_id']}")
     print(f"Student: {record['student_name']}")
+    print(f"Student number: {record['student_number']}")
     print(f"Grade/section: {record['grade_section']}")
     print(f"Event: {record['event_type']}")
     print(f"Date and time: {record['event_date']} {record['event_time']}")
