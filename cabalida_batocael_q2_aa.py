@@ -1,545 +1,618 @@
-# -------- DOCUMENTATION --------
-
 # PSHS-ZRC Student Entrance and Exit Recording System
-# Problem Fixed: Organizes student registration and campus entry/exit records.
-# Target users: School guards and authorized school staff.
-# Features: Register, view, search, update, remove, record entry/exit, view parent messages, and display a daily summary.
-# IDs: A generated QR payload is the student ID; student number is separate (16-YYYY-NNN).
-# Python concepts: Classes, objects, lists, functions, loops, conditions, string methods, input validation, and formatted output.
- 
-# -------- EXPLANATION --------
-# This system helps school guards and authorized staff register students and
-# record campus entry and exit. 
-
-# class Student stores a student's details, while
-# class AttendanceRecord stores each event and its simulated guardian message.
-# class CampusSystem owns the student and attendance lists and performs student lookups. 
-
-# The original menu and functions still control registration, viewing,
-# searching, updating, removal, event recording, message viewing, and the daily summary. 
-# During a scan, a QR code identifies a registered student; the user
-# chooses entry or exit, and the program timestamps the event. The event object
-# is added to the attendance list. The system displays a friendly message, but
-# does not send a real text or email. Input checks help reject blank values,
-# invalid freshman-entry years, and invalid menu choices. All data is
-# temporary and is lost when the program closes.
-# Each student has a generated QR payload as their student ID and a separate
-# student number: 16-YYYY-NNN, where YYYY is their freshman-entry year.
-
-# ADDITIONAL: This program serves as a "prototype" for a planned future project for this sytem, with implementation IRL.
-
-# Developers: 
-# John Edgar A. Cabalida, 11 - Polaris
-# Shan Fernan Emiel F. Batocael, 11 - Sirius
+# Q2 Alternative Assessment program
+# This terminal prototype records student registrations and campus entry/exit events.
+# It uses Linear Search, Insertion Sort, Selection Sort, and Merge Sort implemented
+# directly in this file. It does not use Python's built-in sorting functions.
+# Student identifiers: id_qr is a prototype QR payload; id_no is 16-YYYY-NNN.
+# All records are held in memory and disappear when the program closes.
 
 from datetime import datetime
 
-# Object models and manager used by the menu functions.
+
 class Student:
-    def __init__(self, student_id, student_number, full_name, grade_section, birthday,
-                 contact_number, guardian_name, guardian_contact):
-        # student_id is the string payload represented by the student QR code.
-        self.student_id = student_id
-        self.student_number = student_number
+    """Stores a student's identity, school details, residence, and contacts."""
+
+    def __init__(self, id_qr, id_no, full_name, grade_level, section, birthday,
+                 contact_number, residence_type, intern_subtype, guardian_name,
+                 guardian_contact):
+        self.id_qr = id_qr
+        self.id_no = id_no
         self.full_name = full_name
-        self.grade_section = grade_section
+        self.grade_level = grade_level
+        self.section = section
         self.birthday = birthday
         self.contact_number = contact_number
+        self.residence_type = residence_type
+        self.intern_subtype = intern_subtype
         self.guardian_name = guardian_name
         self.guardian_contact = guardian_contact
-
-    def __getitem__(self, field):
-        return getattr(self, field)
-
-    def __setitem__(self, field, value):
-        if not hasattr(self, field):
-            raise KeyError(field)
-        setattr(self, field, value)
 
 
 class AttendanceRecord:
-    def __init__(self, record_id, student_id, student_number, student_name, grade_section,
-                 guardian_name, guardian_contact, event_type, event_date,
-                 event_time, notification):
+    """Stores one timestamped entry or exit event and its simulated message."""
+
+    def __init__(self, record_id, id_qr, id_no, student_name, grade_level,
+                 section, residence_type, intern_subtype, guardian_name,
+                 guardian_contact, event_type, timestamp, notification):
         self.record_id = record_id
-        self.student_id = student_id
-        self.student_number = student_number
+        self.id_qr = id_qr
+        self.id_no = id_no
         self.student_name = student_name
-        self.grade_section = grade_section
+        self.grade_level = grade_level
+        self.section = section
+        self.residence_type = residence_type
+        self.intern_subtype = intern_subtype
         self.guardian_name = guardian_name
         self.guardian_contact = guardian_contact
         self.event_type = event_type
-        self.event_date = event_date
-        self.event_time = event_time
+        self.timestamp = timestamp
         self.notification = notification
-
-    def __getitem__(self, field):
-        return getattr(self, field)
 
 
 class CampusSystem:
+    """Owns the in-memory student and attendance collections."""
+
     def __init__(self):
         self.student_records = []
         self.attendance_records = []
+        self.next_sequence_by_year = {}
 
-    def create_next_student_number(self, freshman_year):
-        highest_sequence = 0
-        for student in self.student_records:
-            parts = student.student_number.split("-")
-            if len(parts) == 3 and parts[1] == freshman_year:
-                highest_sequence = max(highest_sequence, int(parts[2]))
-        if highest_sequence >= 999:
-            raise ValueError("The student-number sequence for this year is full.")
-        return f"16-{freshman_year}-{highest_sequence + 1:03d}"
+    def create_next_id_no(self, freshman_year):
+        sequence = self.next_sequence_by_year.get(freshman_year, 1)
+        if sequence > 999:
+            raise ValueError("The 001-999 student-number sequence is full for that year.")
+        self.next_sequence_by_year[freshman_year] = sequence + 1
+        return f"16-{freshman_year}-{sequence:03d}"
 
-    def find_student_by_id(self, student_id):
+    def find_student_by_id(self, value):
+        """Linear search by either id_no or id_qr."""
+        target = value.strip().casefold()
         for student in self.student_records:
-            if student.student_id.lower() == student_id.lower():
+            if student.id_no.casefold() == target or student.id_qr.casefold() == target:
                 return student
         return None
 
-    def find_student_by_qr_code(self, qr_code):
-        # The QR code payload is the student's ID itself.
-        return self.find_student_by_id(qr_code)
 
-
-# Keep the original collection names so the existing functions remain intact.
 campus_system = CampusSystem()
 student_records = campus_system.student_records
 attendance_records = campus_system.attendance_records
 
-# Displays the program introduction.
-def display_program_header():
-    print("=" * 58)
-    print("PSHS-ZRC STUDENT ENTRANCE AND EXIT RECORDING SYSTEM")
-    print("=" * 58)
-    print("Registers students and records campus entry and exit events.")
-    print("Intended users: School guards and authorized school staff")
-    print("=" * 58)
 
-# Gets text and rejects blank input.
+def display_program_header():
+    print("=" * 72)
+    print("PSHS-ZRC STUDENT ENTRANCE AND EXIT RECORDING SYSTEM")
+    print("=" * 72)
+    print("Register students and record campus entry and exit events.")
+    print("Residence information is recorded for context, not used to restrict trips.")
+    print("=" * 72)
+
+
+def display_section_header(title):
+    print("\n\n" + "-" * 72)
+    print(f"{title.upper():^72}")
+    print("-" * 72)
+
+
 def get_non_empty_input(prompt):
     while True:
-        user_input = input(prompt).strip()
-        if user_input:
-            return user_input
+        value = input(prompt).strip()
+        if value:
+            return value
         print("Please enter a value. This cannot be blank.")
 
-# Gets a contact number containing at least seven digits.
+
 def get_valid_contact(prompt):
     while True:
-        contact_number = input(prompt).strip()
-        if contact_number.isdigit() and len(contact_number) >= 7:
-            return contact_number
-        print("Please type a contact number with at least 7 digits.")
+        value = input(prompt).strip()
+        if value.isdigit() and len(value) >= 7:
+            return value
+        print("Enter a contact number containing at least seven digits.")
 
-# Gets Y or N for a yes-or-no question.
+
 def get_yes_or_no(prompt):
     while True:
         answer = input(prompt).strip().upper()
         if answer in {"Y", "N"}:
             return answer
-        print("Please type Y for Yes or N for No.")
+        print("Enter Y for Yes or N for No.")
 
-# Checks that the freshman-entry year has exactly four digits.
-def is_valid_freshman_year(year):
-    return len(year) == 4 and year.isdigit()
 
-# Gets the freshman-entry year used in the separate student number.
 def get_freshman_year():
     while True:
         year = input("Year the student entered as a freshman (YYYY): ").strip()
-        if is_valid_freshman_year(year):
+        if len(year) == 4 and year.isdigit():
             return year
         print("Enter a four-digit year, such as 2026.")
 
-# Creates a prototype QR payload; this string is the student's ID.
-def create_qr_code_value(student_number):
-    return f"PSHS-ZRC-STUDENT-{student_number}"
 
-# Shows a clear heading for the selected screen.
-def display_section_header(title):
-    print("\n\n" + "-" * 58)
-    print(f"                 {title.upper()}")
-    print("-" * 58)
+def get_grade_level():
+    while True:
+        level = input("Batch/grade level (7-12): ").strip()
+        if level in {"7", "8", "9", "10", "11", "12"}:
+            return int(level)
+        print("Enter a grade level from 7 through 12.")
 
-# Creates the next student number for the freshman-entry year.
-def create_next_student_number(freshman_year):
-    return campus_system.create_next_student_number(freshman_year)
 
-# Finds one student by student ID.
-def find_student_by_id(student_id):
-    return campus_system.find_student_by_id(student_id)
+def class_has_capacity(grade_level, section, exclude_student=None):
+    """Enforce the stated 30-per-section and three-sections-per-grade limits."""
+    active_students = [student for student in student_records
+                       if student is not exclude_student]
+    if exclude_student is None and len(active_students) >= 540:
+        return False, "The campus capacity of 540 student records has been reached."
+    normalized_section = section.strip().casefold()
+    same_class = [student for student in active_students
+                  if student.grade_level == grade_level
+                  and student.section.casefold() == normalized_section]
+    if len(same_class) >= 30:
+        return False, "This section already has 30 registered students."
+    sections_in_grade = {student.section.casefold() for student in active_students
+                         if student.grade_level == grade_level}
+    if normalized_section not in sections_in_grade and len(sections_in_grade) >= 3:
+        return False, "This grade level already has three registered sections."
+    return True, ""
 
-# Finds one student by QR code.
-def find_student_by_qr_code(qr_code):
-    return campus_system.find_student_by_qr_code(qr_code)
 
-# Adds a new student to the student list.
+def get_residence_details():
+    while True:
+        choice = input("Residence type: [1] Intern (dorm)  [2] Extern: ").strip()
+        if choice == "1":
+            while True:
+                subtype = input(
+                    "Intern type: [1] Weekender  [2] Goes home Friday, returns Sunday: "
+                ).strip()
+                if subtype == "1":
+                    return "Intern", "Weekender"
+                if subtype == "2":
+                    return "Intern", "Friday-home intern"
+                print("Choose 1 or 2.")
+        if choice == "2":
+            return "Extern", "Not applicable"
+        print("Choose 1 for Intern or 2 for Extern.")
+
+
+def create_id_qr(id_no):
+    """Create the prototype text payload represented by the student's QR code."""
+    return f"PSHS-ZRC:STUDENT:{id_no}"
+
+
+def get_student_by_lookup(prompt):
+    value = get_non_empty_input(prompt)
+    student = campus_system.find_student_by_id(value)
+    if student is None:
+        print("Student not found. Check the ID number or QR payload.")
+    return student
+
+
 def register_student():
     display_section_header("Student Registration")
-    print("Enter the student details below.")
-
+    if len(student_records) >= 540:
+        print("The campus capacity of 540 student records has been reached.")
+        return
     full_name = get_non_empty_input("Full name: ")
-    grade_section = get_non_empty_input("Grade and section: ")
+    grade_level = get_grade_level()
+    section = get_non_empty_input("Section name: ")
+    allowed, reason = class_has_capacity(grade_level, section)
+    if not allowed:
+        print(reason)
+        return
     birthday = get_non_empty_input("Birthday (YYYY-MM-DD): ")
     contact_number = get_valid_contact("Student contact number: ")
     freshman_year = get_freshman_year()
-    student_number = create_next_student_number(freshman_year)
-    qr_code = create_qr_code_value(student_number)
+    residence_type, intern_subtype = get_residence_details()
     guardian_name = get_non_empty_input("Parent/guardian full name: ")
     guardian_contact = get_valid_contact("Parent/guardian contact number: ")
+    id_no = campus_system.create_next_id_no(freshman_year)
+    id_qr = create_id_qr(id_no)
 
-    new_student = Student(
-        student_id=qr_code,
-        student_number=student_number,
-        full_name=full_name,
-        grade_section=grade_section,
-        birthday=birthday,
-        contact_number=contact_number,
-        guardian_name=guardian_name,
-        guardian_contact=guardian_contact,
+    student = Student(
+        id_qr, id_no, full_name, grade_level, section, birthday,
+        contact_number, residence_type, intern_subtype, guardian_name,
+        guardian_contact
     )
-
-    student_records.append(new_student)
-
+    student_records.append(student)
     print("\nStudent registered successfully.")
-    print(f"Student ID / QR payload: {new_student['student_id']}")
-    print(f"Student number: {new_student['student_number']}")
+    print(f"Student number (id_no): {student.id_no}")
+    print(f"Student ID / QR payload (id_qr): {student.id_qr}")
 
-# Displays one student record.
-def display_student(student):
-    print("." * 44)
-    print(f"Student ID / QR payload: {student['student_id']}")
-    print(f"Student number: {student['student_number']}")
-    print(f"Full name: {student['full_name']}")
-    print(f"Grade/section: {student['grade_section']}")
-    print(f"Birthday: {student['birthday']}")
-    print(f"Student contact: {student['contact_number']}")
-    print(f"Parent/guardian: {student['guardian_name']}")
-    print(f"Guardian contact: {student['guardian_contact']}")
 
-# Displays all registered students.
-def display_all_students():
-    display_section_header("View All Students")
+def print_student(student):
+    print("." * 68)
+    print(f"Student number (id_no): {student.id_no}")
+    print(f"Student ID / QR payload (id_qr): {student.id_qr}")
+    print(f"Name: {student.full_name}")
+    print(f"Batch/grade: {student.grade_level} | Section: {student.section}")
+    print(f"Birthday: {student.birthday}")
+    print(f"Student contact: {student.contact_number}")
+    print(f"Residence: {student.residence_type} | Type: {student.intern_subtype}")
+    print(f"Parent/guardian: {student.guardian_name}")
+    print(f"Guardian contact: {student.guardian_contact}")
 
-    if not student_records:
-        print("There are no registered students yet.")
+
+def insertion_sort(items, key_function):
+    """Return a new list sorted with the class Insertion Sort algorithm."""
+    result = list(items)
+    for index in range(1, len(result)):
+        current_item = result[index]
+        current_key = key_function(current_item)
+        position = index - 1
+        while position >= 0 and key_function(result[position]) > current_key:
+            result[position + 1] = result[position]
+            position -= 1
+        result[position + 1] = current_item
+    return result
+
+
+def selection_sort(items, key_function):
+    """Return a new list sorted with the class Selection Sort algorithm."""
+    result = list(items)
+    for start in range(len(result) - 1):
+        smallest = start
+        for scan in range(start + 1, len(result)):
+            if key_function(result[scan]) < key_function(result[smallest]):
+                smallest = scan
+        if smallest != start:
+            result[start], result[smallest] = result[smallest], result[start]
+    return result
+
+
+def merge_sort(items, key_function):
+    """Return a new list sorted with a stable recursive Merge Sort."""
+    if len(items) <= 1:
+        return list(items)
+    middle = len(items) // 2
+    left = merge_sort(items[:middle], key_function)
+    right = merge_sort(items[middle:], key_function)
+    merged = []
+    left_index = 0
+    right_index = 0
+    while left_index < len(left) and right_index < len(right):
+        if key_function(left[left_index]) <= key_function(right[right_index]):
+            merged.append(left[left_index])
+            left_index += 1
+        else:
+            merged.append(right[right_index])
+            right_index += 1
+    merged.extend(left[left_index:])
+    merged.extend(right[right_index:])
+    return merged
+
+
+def student_class_key(student):
+    return student.grade_level, student.section.casefold(), student.full_name.casefold()
+
+
+def student_number_key(student):
+    return student.id_no
+
+
+def timestamp_key(record):
+    return record.timestamp
+
+
+def display_student_list(students, title):
+    display_section_header(title)
+    if not students:
+        print("No students to display.")
         return
+    for student in students:
+        print_student(student)
+    print("." * 68)
+    print(f"Total students: {len(students)}")
 
-    for student in student_records:
-        display_student(student)
-    print("." * 44)
-    print(f"Total students: {len(student_records)}")
 
-# Searches students using a keyword.
-def search_student():
-    display_section_header("Search Student")
-    print("Search by student ID/QR payload, student number, name, or grade/section.")
-    keyword = get_non_empty_input("Search keyword: ").lower()
+def view_students_by_class():
+    ordered = insertion_sort(student_records, student_class_key)
+    display_student_list(ordered, "Students by grade, section, and name (Insertion Sort)")
+
+
+def linear_search_students(keyword):
+    """Find substring matches by scanning student records from first to last."""
+    target = keyword.casefold()
     matches = []
-
     for student in student_records:
-        searchable_text = (
-            student["student_id"] + " "
-            + student["student_number"] + " "
-            + student["full_name"] + " "
-            + student["grade_section"]
-        ).lower()
-
-        if keyword in searchable_text:
+        searchable_text = " ".join((
+            student.id_qr, student.id_no, student.full_name,
+            str(student.grade_level), student.section, student.residence_type,
+            student.intern_subtype, student.guardian_name
+        )).casefold()
+        if target in searchable_text:
             matches.append(student)
+    return matches
 
+
+def search_students():
+    display_section_header("Student Record Finder")
+    print("Search by id_qr, id_no, name, batch/grade, section, or residence.")
+    keyword = get_non_empty_input("Search term: ")
+    matches = linear_search_students(keyword)
     if not matches:
         print("No matching student was found.")
         return
+    ordered_matches = insertion_sort(matches, student_class_key)
+    print(f"Found {len(matches)} matching student(s). Results sorted by class.")
+    for student in ordered_matches:
+        print_student(student)
 
-    print(f"Found {len(matches)} matching student(s).")
-    for student in matches:
-        display_student(student)
 
-# Updates selected fields in a student record.
-def update_student():
-    display_section_header("Update Student")
-    student_id = get_non_empty_input("Student ID / QR payload to update: ")
-    student = find_student_by_id(student_id)
+def view_students_by_id_no():
+    ordered = selection_sort(student_records, student_number_key)
+    display_student_list(ordered, "Students by id_no (Selection Sort)")
 
-    if student is None:
-        print("Student not found. Check the ID and try again.")
-        return
 
-    print("Press Enter to keep the current value.")
-    display_student(student)
-
-    new_name = input(f"New full name [{student['full_name']}]: ").strip()
-    new_grade_section = input(
-        f"New grade and section [{student['grade_section']}]: "
-    ).strip()
-    new_birthday = input(f"New birthday [{student['birthday']}]: ").strip()
-    new_contact = input(
-        f"New student contact [{student['contact_number']}]: "
-    ).strip()
-    new_guardian_name = input(
-        f"New parent/guardian name [{student['guardian_name']}]: "
-    ).strip()
-    new_guardian_contact = input(
-        f"New guardian contact [{student['guardian_contact']}]: "
-    ).strip()
-
-    if new_name:
-        student["full_name"] = new_name
-    if new_grade_section:
-        student["grade_section"] = new_grade_section
-    if new_birthday:
-        student["birthday"] = new_birthday
-    if new_contact:
-        if new_contact.isdigit() and len(new_contact) >= 7:
-            student["contact_number"] = new_contact
-        else:
-            print("Invalid student contact. The old value was kept.")
-    if new_guardian_name:
-        student["guardian_name"] = new_guardian_name
-    if new_guardian_contact:
-        if new_guardian_contact.isdigit() and len(new_guardian_contact) >= 7:
-            student["guardian_contact"] = new_guardian_contact
-        else:
-            print("Invalid guardian contact. The old value was kept.")
-
-    print("Student record updated successfully.")
-
-# Removes a student after confirmation.
-def remove_student():
-    display_section_header("Remove Student")
-    student_id = get_non_empty_input("Student ID / QR payload to remove: ")
-    student = find_student_by_id(student_id)
-
-    if student is None:
-        print("Student not found. Check the ID and try again.")
-        return
-
-    display_student(student)
-    confirmation = get_yes_or_no("Remove this record? Type Y for Yes, N for No: ")
-
-    if confirmation == "Y":
-        student_records.remove(student)
-        print("Student removed successfully.")
-    else:
-        print("Removal cancelled. The record was kept.")
-
-# Builds a friendly parent or guardian message.
-def build_notification(student, event_type, event_date, event_time):
+def build_notification(student, event_type, timestamp):
     return (
-        f"Hello po, Ma'am/Sir {student['guardian_name']}!\n\n"
-        f"This is a school guard-house notification.\n"
-        f"Student name: {student['full_name']}\n"
-        f"Student number: {student['student_number']}\n"
-        f"Grade/section: {student['grade_section']}\n"
+        f"Hello po, Ma'am/Sir {student.guardian_name}!\n\n"
+        "This is a school guard-house notification.\n"
+        f"Student: {student.full_name}\n"
+        f"Student number (id_no): {student.id_no}\n"
+        f"Residence: {student.residence_type} ({student.intern_subtype})\n"
         f"Event: Student {event_type.lower()}\n"
-        f"Date: {event_date}\n"
-        f"Time: {event_time}\n\n"
-        f"Your child's campus record has been updated. Thank you po!"
+        f"Date and time: {timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}\n\n"
+        "The campus record has been updated. Thank you po!"
     )
 
-# Displays the detailed parent or guardian message.
-def display_parent_message(record):
-    display_section_header("Message Sent to Parent/Guardian")
-    print(f"Recipient: Parent/guardian of {record['student_name']}")
-    print(f"Guardian contact: {record['guardian_contact']}")
-    print(f"Related record ID: {record['record_id']}")
-    print("." * 58)
-    print(record["notification"])
-    print("." * 58)
-    print("Prototype notice: This message is displayed only.")
-    print("It is not sent through SMS, email, or another service yet.")
 
-# Records a student entry or exit and prepares a message.
 def record_entry_or_exit():
     display_section_header("Record Student Entry or Exit")
-    print("Type the registered QR code, then choose Entry or Exit.")
-    qr_code = get_non_empty_input("Student ID / QR payload: ").upper()
-    student = find_student_by_qr_code(qr_code)
-
+    value = get_non_empty_input("Scan/type the student's id_qr payload: ")
+    student = campus_system.find_student_by_id(value)
     if student is None:
-        print("QR code not found. Check the code or register the student first.")
+        print("No matching student. Check the QR payload or use id_no instead.")
         return
-
     while True:
-        event_choice = input("Type E for Entry or X for Exit: ").strip().upper()
-        if event_choice in {"E", "X"}:
+        choice = input("Type E for Entry or X for Exit: ").strip().upper()
+        if choice in {"E", "X"}:
             break
-        print("Please type E for Entry or X for Exit.")
-
-    event_type = "ENTRY" if event_choice == "E" else "EXIT"
-    current_time = datetime.now()
-    event_date = current_time.strftime("%Y-%m-%d")
-    event_time = current_time.strftime("%I:%M %p")
-    notification = build_notification(
-        student, event_type, event_date, event_time
+        print("Enter E for Entry or X for Exit.")
+    event_type = "ENTRY" if choice == "E" else "EXIT"
+    timestamp = datetime.now()
+    notification = build_notification(student, event_type, timestamp)
+    record = AttendanceRecord(
+        len(attendance_records) + 1, student.id_qr, student.id_no,
+        student.full_name, student.grade_level, student.section,
+        student.residence_type, student.intern_subtype, student.guardian_name,
+        student.guardian_contact, event_type, timestamp, notification
     )
+    attendance_records.append(record)
+    print("\nEvent recorded.")
+    print(f"{record.student_name} | {record.id_no} | {record.event_type}")
+    print(timestamp.strftime("%Y-%m-%d %I:%M:%S %p"))
+    if get_yes_or_no("Display the simulated guardian message now? (Y/N): ") == "Y":
+        display_parent_message(record)
 
-    new_record = AttendanceRecord(
-        record_id=len(attendance_records) + 1,
-        student_id=student["student_id"],
-        student_number=student["student_number"],
-        student_name=student["full_name"],
-        grade_section=student["grade_section"],
-        guardian_name=student["guardian_name"],
-        guardian_contact=student["guardian_contact"],
-        event_type=event_type,
-        event_date=event_date,
-        event_time=event_time,
-        notification=notification,
-    )
 
-    attendance_records.append(new_record)
+def print_attendance_record(record):
+    print("." * 68)
+    print(f"Record ID: {record.record_id}")
+    print(f"Student: {record.student_name} | id_no: {record.id_no}")
+    print(f"id_qr: {record.id_qr}")
+    print(f"Batch/grade: {record.grade_level} | Section: {record.section}")
+    print(f"Residence: {record.residence_type} | Type: {record.intern_subtype}")
+    print(f"Event: {record.event_type}")
+    print(f"Date/time: {record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
 
-    print("\nRecord saved successfully.")
-    print(f"Student: {new_record['student_name']}")
-    print(f"Student number: {new_record['student_number']}")
-    print(f"Grade/section: {new_record['grade_section']}")
-    print(f"Event: {new_record['event_type']}")
-    print(f"Date and time: {event_date} {event_time}")
 
-    view_now = get_yes_or_no(
-        "View the message sent to the parent now? Type Y for Yes, N for No: "
-    )
-    if view_now == "Y":
-        display_parent_message(new_record)
-
-# Displays one entrance or exit record.
-def display_attendance_record(record):
-    print("." * 44)
-    print(f"Record ID: {record['record_id']}")
-    print(f"Student: {record['student_name']}")
-    print(f"Student number: {record['student_number']}")
-    print(f"Grade/section: {record['grade_section']}")
-    print(f"Event: {record['event_type']}")
-    print(f"Date and time: {record['event_date']} {record['event_time']}")
-
-# Displays today's attendance records.
-def display_todays_records():
-    display_section_header("View Today's Records")
-    today = datetime.now().strftime("%Y-%m-%d")
-    todays_records = []
-
-    for record in attendance_records:
-        if record["event_date"] == today:
-            todays_records.append(record)
-
-    if not todays_records:
-        print("There are no records for today yet.")
+def display_attendance_list(records, title, algorithm_name):
+    display_section_header(f"{title} ({algorithm_name})")
+    if not records:
+        print("No attendance events to display.")
         return
+    for record in records:
+        print_attendance_record(record)
+    print("." * 68)
+    print(f"Total events: {len(records)}")
 
-    for record in todays_records:
-        display_attendance_record(record)
-    print("." * 44)
-    print(f"Total records today: {len(todays_records)}")
 
-# Finds and displays a selected parent or guardian message.
+def view_all_events_chronologically():
+    ordered = merge_sort(attendance_records, timestamp_key)
+    display_attendance_list(ordered, "All Attendance Events by Date and Time", "Merge Sort")
+
+
+def view_todays_events():
+    today = datetime.now().date()
+    todays_records = [record for record in attendance_records
+                      if record.timestamp.date() == today]
+    ordered = insertion_sort(todays_records, timestamp_key)
+    display_attendance_list(ordered, "Today's Attendance Events", "Insertion Sort")
+
+
+def view_student_history():
+    display_section_header("Student Attendance History")
+    student = get_student_by_lookup("Enter id_no or id_qr: ")
+    if student is None:
+        return
+    history = [record for record in attendance_records if record.id_qr == student.id_qr]
+    ordered = merge_sort(history, timestamp_key)
+    print(f"History for {student.full_name} ({student.id_no})")
+    print("Residence type is descriptive only; no travel rules are enforced.")
+    display_attendance_list(ordered, "Student Events in Date/Time Order", "Merge Sort")
+
+
+def display_parent_message(record):
+    display_section_header("Simulated Parent/Guardian Message")
+    print(f"Recipient: Parent/guardian of {record.student_name}")
+    print(f"Guardian contact: {record.guardian_contact}")
+    print(f"Related record ID: {record.record_id}")
+    print("." * 68)
+    print(record.notification)
+    print("." * 68)
+    print("This prototype displays the message only. It does not send SMS or email.")
+
+
 def view_parent_message():
-    display_section_header("View Message Sent to Parent/Guardian")
-
     if not attendance_records:
         print("There are no recorded messages yet.")
         return
-
-    print("Available recording IDs:")
     for record in attendance_records:
-        print(
-            f"[{record['record_id']}] {record['student_name']} - "
-            f"{record['event_type']} - {record['event_date']} {record['event_time']}"
-        )
-
+        print(f"[{record.record_id}] {record.student_name} - {record.event_type} - "
+              f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
     record_id = get_non_empty_input("Recording ID to view: ")
-
     if not record_id.isdigit():
-        print("Please type a recording ID number, such as 1.")
+        print("Enter a numeric recording ID.")
         return
-
-    selected_record = None
     for record in attendance_records:
-        if record["record_id"] == int(record_id):
-            selected_record = record
-            break
+        if record.record_id == int(record_id):
+            display_parent_message(record)
+            return
+    print("Recording not found.")
 
-    if selected_record is None:
-        print("Recording not found. Check the ID and try again.")
-        return
 
-    display_parent_message(selected_record)
-
-# Counts today's entries and exits.
 def display_daily_summary():
+    today = datetime.now().date()
+    entries = sum(1 for record in attendance_records
+                  if record.timestamp.date() == today and record.event_type == "ENTRY")
+    exits = sum(1 for record in attendance_records
+                if record.timestamp.date() == today and record.event_type == "EXIT")
     display_section_header("Daily Summary")
-    today = datetime.now().strftime("%Y-%m-%d")
-    entry_count = 0
-    exit_count = 0
-
-    for record in attendance_records:
-        if record["event_date"] == today:
-            if record["event_type"] == "ENTRY":
-                entry_count += 1
-            elif record["event_type"] == "EXIT":
-                exit_count += 1
-
     print(f"Date: {today}")
-    print(f"Total records: {entry_count + exit_count}")
-    print(f"Total entries: {entry_count}")
-    print(f"Total exits: {exit_count}")
+    print(f"Total events: {entries + exits}")
+    print(f"Entries: {entries}")
+    print(f"Exits: {exits}")
 
-# Displays and validates the main menu.
+
+def view_current_presence_estimate():
+    """Infer a session-only status from each student's latest recorded event."""
+    latest_by_id_qr = {}
+    for record in attendance_records:
+        previous = latest_by_id_qr.get(record.id_qr)
+        if previous is None or record.timestamp > previous.timestamp:
+            latest_by_id_qr[record.id_qr] = record
+    students_with_events = [
+        student for student in student_records if student.id_qr in latest_by_id_qr
+    ]
+    ordered = insertion_sort(students_with_events, student_class_key)
+    display_section_header("Estimated Current Campus Presence")
+    print("Estimate from the latest event recorded in this running session only.")
+    print("It is not a live or persistent attendance register.")
+    if not ordered:
+        print("No student has a recorded event in this session.")
+        return
+    for student in ordered:
+        latest = latest_by_id_qr[student.id_qr]
+        status = "PRESUMED ON CAMPUS" if latest.event_type == "ENTRY" else "PRESUMED OFF CAMPUS"
+        print(f"{student.id_no} | {student.full_name} | {student.grade_level}-{student.section}")
+        print(f"{status} based on latest {latest.event_type} at "
+              f"{latest.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
+
+
 def display_menu():
-    print("\n\n" + "=" * 58)
-    print("                 MAIN MENU")
-    print("=" * 58)
-    print("Choose one number. Type 10 to exit the program.")
-    print("[1] Register Student")
-    print("[2] View All Students")
-    print("[3] Search Student")
-    print("[4] Update Student")
-    print("[5] Remove Student")
-    print("[6] Record Student Entry or Exit")
-    print("[7] View Today's Records")
-    print("[8] View Message Sent to Parent/Guardian")
-    print("[9] Daily Summary")
-    print("[10] Exit")
-    print("=" * 58)
-
+    print("\n" + "=" * 72)
+    print("MAIN MENU")
+    print("=" * 72)
+    print("[1] Register student")
+    print("[2] View students by grade, section, and name (Insertion Sort)")
+    print("[3] Find student; search results ordered by class (Linear + Insertion)")
+    print("[4] Update student details")
+    print("[5] Remove student")
+    print("[6] Record student entry/exit")
+    print("[7] View all events by date/time (Merge Sort)")
+    print("[8] View today's events by time (Insertion Sort)")
+    print("[9] View a student's chronological event history (Merge Sort)")
+    print("[10] View students by id_no (Selection Sort)")
+    print("[11] Estimate current presence from latest recorded event")
+    print("[12] View simulated guardian message")
+    print("[13] Daily summary")
+    print("[14] Exit")
     while True:
-        menu_choice = input("Menu choice (1-10): ").strip()
-        if menu_choice in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}:
-            return menu_choice
-        print("Invalid choice. Please type a number from 1 to 10.")
+        choice = input("Menu choice (1-14): ").strip()
+        if choice in {str(number) for number in range(1, 15)}:
+            return choice
+        print("Enter a number from 1 through 14.")
 
-# Runs the menu until the user exits.
+
+def update_student():
+    display_section_header("Update Student")
+    student = get_student_by_lookup("Student id_no or id_qr to update: ")
+    if student is None:
+        return
+    print("Press Enter to keep each current value.")
+    print_student(student)
+    name = input(f"New name [{student.full_name}]: ").strip()
+    grade = input(f"New batch/grade 7-12 [{student.grade_level}]: ").strip()
+    section = input(f"New section [{student.section}]: ").strip()
+    birthday = input(f"New birthday [{student.birthday}]: ").strip()
+    contact = input(f"New student contact [{student.contact_number}]: ").strip()
+    guardian = input(f"New guardian name [{student.guardian_name}]: ").strip()
+    guardian_contact = input(
+        f"New guardian contact [{student.guardian_contact}]: "
+    ).strip()
+    if name:
+        student.full_name = name
+    proposed_grade = student.grade_level
+    proposed_section = student.section
+    valid_grade = not grade or grade in {"7", "8", "9", "10", "11", "12"}
+    if grade and valid_grade:
+        proposed_grade = int(grade)
+    elif grade:
+        print("Enter a grade from 7 through 12; previous value kept.")
+    if section:
+        proposed_section = section
+    if (grade or section) and valid_grade:
+        allowed, reason = class_has_capacity(
+            proposed_grade, proposed_section, exclude_student=student
+        )
+        if allowed:
+            student.grade_level = proposed_grade
+            student.section = proposed_section
+        else:
+            print(f"Class change not applied: {reason}")
+    if birthday:
+        student.birthday = birthday
+    if contact:
+        if contact.isdigit() and len(contact) >= 7:
+            student.contact_number = contact
+        else:
+            print("Invalid contact; previous value kept.")
+    if guardian:
+        student.guardian_name = guardian
+    if guardian_contact:
+        if guardian_contact.isdigit() and len(guardian_contact) >= 7:
+            student.guardian_contact = guardian_contact
+        else:
+            print("Invalid guardian contact; previous value kept.")
+    residence_choice = input("Change residence type? [Y/N]: ").strip().upper()
+    if residence_choice == "Y":
+        student.residence_type, student.intern_subtype = get_residence_details()
+    print("Student record updated.")
+
+
+def remove_student():
+    display_section_header("Remove Student")
+    student = get_student_by_lookup("Student id_no or id_qr to remove: ")
+    if student is None:
+        return
+    print_student(student)
+    if get_yes_or_no("Remove this student? (Y/N): ") == "Y":
+        student_records.remove(student)
+        print("Student removed. Existing attendance events remain in this session.")
+    else:
+        print("Removal cancelled.")
+
+
 def run_program():
     display_program_header()
-
+    actions = {
+        "1": register_student,
+        "2": view_students_by_class,
+        "3": search_students,
+        "4": update_student,
+        "5": remove_student,
+        "6": record_entry_or_exit,
+        "7": view_all_events_chronologically,
+        "8": view_todays_events,
+        "9": view_student_history,
+        "10": view_students_by_id_no,
+        "11": view_current_presence_estimate,
+        "12": view_parent_message,
+        "13": display_daily_summary,
+    }
     while True:
-        menu_choice = display_menu()
-
-        if menu_choice == "1":
-            register_student()
-        elif menu_choice == "2":
-            display_all_students()
-        elif menu_choice == "3":
-            search_student()
-        elif menu_choice == "4":
-            update_student()
-        elif menu_choice == "5":
-            remove_student()
-        elif menu_choice == "6":
-            record_entry_or_exit()
-        elif menu_choice == "7":
-            display_todays_records()
-        elif menu_choice == "8":
-            view_parent_message()
-        elif menu_choice == "9":
-            display_daily_summary()
-        elif menu_choice == "10":
-            print("\nThank you for using the PSHS-ZRC Student Entrance and Exit Recording System.")
+        choice = display_menu()
+        if choice == "14":
+            print("\nThank you for using the campus recording system.")
             break
+        actions[choice]()
 
-# Starts the program.
+
 if __name__ == "__main__":
     run_program()
