@@ -158,7 +158,7 @@ def get_yes_or_no(prompt):
 
 def get_freshman_year():
     while True:
-        year = input("Year the student entered as a freshman (YYYY): ").strip()
+        year = input("Student's Freshman Year: ").strip()
         if len(year) == 4 and year.isdigit():
             return year
         print("Enter a four-digit year, such as 2026.")
@@ -207,7 +207,7 @@ def class_has_capacity(grade_level, section, exclude_student=None):
 
 def get_residence_details():
     while True:
-        choice = input("Residence type: [1] Intern (dorm)  [2] Extern: ").strip()
+        choice = input("Residence (1 if intern, 2 if extern): ").strip()
         if choice == "1":
             while True:
                 subtype = input(
