@@ -139,51 +139,71 @@ def display_section_header(title):
     print("-" * 72)
 
 
-def get_non_empty_input(prompt):
+def get_non_empty_input(prompt, back_label=None):
     while True:
+        if back_label:
+            print(f"[B] {back_label}")
         value = input(prompt).strip()
+        if back_label and value.upper() == "B":
+            return CANCEL_ACTION
         if value:
             return value
         print("Please enter a value. This cannot be blank.")
 
 
-def get_valid_contact(prompt):
+def get_valid_contact(prompt, back_label=None):
     while True:
+        if back_label:
+            print(f"[B] {back_label}")
         value = input(prompt).strip()
+        if back_label and value.upper() == "B":
+            return CANCEL_ACTION
         if value.isdigit() and len(value) >= 7:
             return value
         print("Enter a contact number containing at least seven digits.")
 
 
-def get_yes_or_no(prompt):
+def get_yes_or_no(prompt, back_label=None):
     while True:
         print(prompt)
         print("[Y] Yes")
         print("[N] No")
+        if back_label:
+            print(f"[B] {back_label}")
         answer = input("Choose an option: ").strip().upper()
         if answer in {"Y", "N"}:
             return answer
+        if back_label and answer == "B":
+            return CANCEL_ACTION
         print("Enter Y for Yes or N for No.")
 
 
-def get_freshman_year():
+def get_freshman_year(back_label=None):
     while True:
+        if back_label:
+            print(f"[B] {back_label}")
         year = input("Student's freshman year: ").strip()
+        if back_label and year.upper() == "B":
+            return CANCEL_ACTION
         if len(year) == 4 and year.isdigit():
             return year
         print("Enter a four-digit year, such as 2026.")
 
 
-def get_class_assignment(current=None):
+def get_class_assignment(current=None, back_label=None):
     """Choose one of the school's fixed grade-and-section combinations."""
     print("Choose the student's grade and section:")
     for number, (grade_level, section) in enumerate(CLASS_OPTIONS, start=1):
-        print(f"[{number}] G{grade_level} - {section}")
+        print(f"    [{number}] G{grade_level} - {section}")
     if current is not None:
         print(f"[Enter] Keep current class (G{current[0]} - {current[1]})")
+    if back_label:
+        print(f"[B] {back_label}")
 
     while True:
         choice = input("Class option (1-18): ").strip()
+        if back_label and choice.upper() == "B":
+            return CANCEL_ACTION
         if not choice and current is not None:
             return None
         if choice.isdigit() and 1 <= int(choice) <= len(CLASS_OPTIONS):
@@ -215,17 +235,24 @@ def class_has_capacity(grade_level, section, exclude_student=None):
     return True, ""
 
 
-def get_residence_details():
+def get_residence_details(back_label=None):
     while True:
         print("Residence type")
         print("[1] Intern")
         print("[2] Extern")
+        if back_label:
+            print(f"[B] {back_label}")
         choice = input("Choose residence type: ").strip()
+        if back_label and choice.upper() == "B":
+            return CANCEL_ACTION
         if choice == "1":
             while True:
                 print("[1] Weekender")
                 print("[2] Goes home Friday, returns Sunday")
+                print("[B] Back to residence type")
                 subtype = input("Choose intern type: ").strip()
+                if subtype.upper() == "B":
+                    break
                 if subtype == "1":
                     return "Intern", "Weekender"
                 if subtype == "2":
@@ -241,8 +268,10 @@ def create_id_qr(id_no):
     return f"PSHS-ZRC:STUDENT:{id_no}"
 
 
-def get_student_by_lookup(prompt):
-    value = get_non_empty_input(prompt)
+def get_student_by_lookup(prompt, back_label=None):
+    value = get_non_empty_input(prompt, back_label)
+    if value is CANCEL_ACTION:
+        return CANCEL_ACTION
     student = campus_system.find_student_by_id(value)
     if student is None:
         print("Student not found. Check the ID number or QR payload.")
@@ -254,18 +283,38 @@ def register_student():
     if len(student_records) >= 540:
         print("The campus capacity of 540 student records has been reached.")
         return
-    full_name = get_non_empty_input("Full name: ")
-    grade_level, section = get_class_assignment()
+    full_name = get_non_empty_input("Full name: ", "Cancel registration")
+    if full_name is CANCEL_ACTION:
+        return
+    class_assignment = get_class_assignment(back_label="Cancel registration")
+    if class_assignment is CANCEL_ACTION:
+        return
+    grade_level, section = class_assignment
     allowed, reason = class_has_capacity(grade_level, section)
     if not allowed:
         print(reason)
         return
-    birthday = get_non_empty_input("Birthday (YYYY-MM-DD): ")
-    contact_number = get_valid_contact("Student contact number: ")
-    freshman_year = get_freshman_year()
-    residence_type, intern_subtype = get_residence_details()
-    guardian_name = get_non_empty_input("Parent/guardian full name: ")
-    guardian_contact = get_valid_contact("Parent/guardian contact number: ")
+    birthday = get_non_empty_input("Birthday (YYYY-MM-DD): ", "Cancel registration")
+    if birthday is CANCEL_ACTION:
+        return
+    contact_number = get_valid_contact("Student contact number: ", "Cancel registration")
+    if contact_number is CANCEL_ACTION:
+        return
+    freshman_year = get_freshman_year("Cancel registration")
+    if freshman_year is CANCEL_ACTION:
+        return
+    residence = get_residence_details("Cancel registration")
+    if residence is CANCEL_ACTION:
+        return
+    residence_type, intern_subtype = residence
+    guardian_name = get_non_empty_input("Parent/guardian full name: ", "Cancel registration")
+    if guardian_name is CANCEL_ACTION:
+        return
+    guardian_contact = get_valid_contact(
+        "Parent/guardian contact number: ", "Cancel registration"
+    )
+    if guardian_contact is CANCEL_ACTION:
+        return
     id_no = campus_system.create_next_id_no(freshman_year)
     id_qr = create_id_qr(id_no)
 
@@ -385,7 +434,9 @@ def format_notification(student_name, id_no, guardian_name, residence_type,
 
 def record_entry_or_exit():
     display_section_header("Record Student Entry or Exit")
-    value = get_non_empty_input("Student number or QR ID: ")
+    value = get_non_empty_input("Student number or QR ID: ", "Back to main menu")
+    if value is CANCEL_ACTION:
+        return
     student = campus_system.find_student_by_id(value)
     if student is None:
         print("Student not found. Check the student number or QR ID.")
@@ -459,7 +510,10 @@ def edit_attendance_record(record):
             record.event_type = "ENTRY" if movement == "1" else "EXIT"
         else:
             while True:
+                print("[B] Back to event details")
                 value = input("New date/time (YYYY-MM-DD HH:MM:SS; Enter keeps current): ").strip()
+                if value.upper() == "B":
+                    break
                 if not value:
                     break
                 try:
@@ -467,6 +521,8 @@ def edit_attendance_record(record):
                     break
                 except ValueError:
                     print("Enter a valid date and time in YYYY-MM-DD HH:MM:SS format.")
+            if value.upper() == "B":
+                continue
 
         record.notification = build_record_notification(record)
         print("Event updated.")
@@ -531,7 +587,7 @@ def view_parent_message():
         page_records = newest_first[start:start + PAGE_SIZE]
         display_section_header(f"Simulated Guardian Messages | Page {page + 1} of {total_pages}")
         for position, record in enumerate(page_records, start=1):
-            print(f"[{position}] {record.student_name} | {record.id_no} | "
+            print(f"    [{position}] {record.student_name} | {record.id_no} | "
                   f"{describe_movement(record.event_type)} | "
                   f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
         choices = {str(i) for i in range(1, len(page_records) + 1)} | {"B"}
@@ -581,7 +637,7 @@ def display_daily_summary(today=None):
 
 def display_main_menu():
     print("\n" + "=" * 72)
-    print("MAIN MENU")
+    print(f"{'MAIN MENU':^72}")
     print("=" * 72)
     print("[1] Record student entry/exit")
     print("[2] Register student")
@@ -595,6 +651,8 @@ def display_main_menu():
 
 RETURN_TO_MAIN = object()
 RETURN_TO_SEARCH = object()
+CANCEL_ACTION = object()
+RETURN_TO_PREVIOUS = object()
 PAGE_SIZE = 10
 
 
@@ -615,7 +673,7 @@ def prompt_calendar_date(prompt, date_format, format_hint):
         raw_value = input(f"{prompt} ({format_hint}): ").strip()
         command = raw_value.upper()
         if command == "B":
-            return None
+            return RETURN_TO_PREVIOUS
         if command == "M":
             return RETURN_TO_MAIN
         try:
@@ -668,17 +726,28 @@ def run_find_student_menu():
             return
 
         if choice == "1":
-            grade_level, section = get_class_assignment()
+            class_assignment = get_class_assignment(back_label="Back to search options")
+            if class_assignment is CANCEL_ACTION:
+                continue
+            grade_level, section = class_assignment
             matches = find_students_by_class(grade_level, section)
             title = f"G{grade_level} - {section}"
             results_provider = lambda: find_students_by_class(grade_level, section)
         elif choice == "2":
-            keyword = get_non_empty_input("Enter all or part of the student's name: ")
+            keyword = get_non_empty_input(
+                "Enter all or part of the student's name: ", "Back to search options"
+            )
+            if keyword is CANCEL_ACTION:
+                continue
             matches = find_students_by_name(keyword)
             title = f"Name matches for {keyword!r}"
             results_provider = lambda: find_students_by_name(keyword)
         else:
-            keyword = get_non_empty_input("Enter the full or partial student ID number: ")
+            keyword = get_non_empty_input(
+                "Enter the full or partial student ID number: ", "Back to search options"
+            )
+            if keyword is CANCEL_ACTION:
+                continue
             matches = find_students_by_number(keyword)
             title = f"Student number matches for {keyword!r}"
             results_provider = lambda: find_students_by_number(keyword)
@@ -705,7 +774,7 @@ def browse_student_results(students, title, results_provider=None):
         page_students = students[start:start + PAGE_SIZE]
         display_section_header(f"{title} | Page {page + 1} of {total_pages}")
         for position, student in enumerate(page_students, start=1):
-            print(f"[{position}] {student.id_no} | {student.full_name} | "
+            print(f"    [{position}] {student.id_no} | {student.full_name} | "
                   f"Grade {student.grade_level}, {student.section}")
         choices = {str(i) for i in range(1, len(page_students) + 1)} | {"B", "M"}
         if page > 0:
@@ -823,6 +892,8 @@ def run_student_history_menu(student):
 
         if selected_date is RETURN_TO_MAIN:
             return RETURN_TO_MAIN
+        if selected_date is RETURN_TO_PREVIOUS:
+            return None
         if selected_date is None:
             continue
         navigation = filter_student_history(student, period, selected_date)
@@ -854,7 +925,7 @@ def browse_attendance_records(records, title, back_label="Back", sorter=merge_so
         page_records = records[start:start + PAGE_SIZE]
         display_section_header(f"{title} | Page {page + 1} of {total_pages}")
         for position, record in enumerate(page_records, start=1):
-            print(f"[{position}] Event {record.record_id} | {record.student_name} | "
+            print(f"    [{position}] Event {record.record_id} | {record.student_name} | "
                   f"{record.id_no} | {describe_movement(record.event_type)} | "
                   f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
         choices = {str(i) for i in range(1, len(page_records) + 1)} | {"B", "M"}
@@ -928,19 +999,61 @@ def run_event_edit_menu():
 def update_student(student=None):
     display_section_header("Update Student")
     if student is None:
-        student = get_student_by_lookup("Student number or QR ID to update: ")
+        student = get_student_by_lookup(
+            "Student number or QR ID to update: ", "Back to update/remove menu"
+        )
+    if student is CANCEL_ACTION:
+        return False
     if student is None:
-        return
+        return False
     print("Press Enter to keep each current value.")
+    print("Enter B at any prompt to cancel without saving changes.")
     print_student(student)
     name = input(f"New name [{student.full_name}]: ").strip()
-    new_class = get_class_assignment((student.grade_level, student.section))
+    if name.upper() == "B":
+        print("Update cancelled; no changes were saved.")
+        return False
+    new_class = get_class_assignment(
+        (student.grade_level, student.section), "Cancel update"
+    )
+    if new_class is CANCEL_ACTION:
+        print("Update cancelled; no changes were saved.")
+        return False
     birthday = input(f"New birthday [{student.birthday}]: ").strip()
+    if birthday.upper() == "B":
+        print("Update cancelled; no changes were saved.")
+        return False
     contact = input(f"New student contact [{student.contact_number}]: ").strip()
+    if contact.upper() == "B":
+        print("Update cancelled; no changes were saved.")
+        return False
     guardian = input(f"New guardian name [{student.guardian_name}]: ").strip()
+    if guardian.upper() == "B":
+        print("Update cancelled; no changes were saved.")
+        return False
     guardian_contact = input(
         f"New guardian contact [{student.guardian_contact}]: "
     ).strip()
+    if guardian_contact.upper() == "B":
+        print("Update cancelled; no changes were saved.")
+        return False
+    change_residence = get_yes_or_no("Change residence type?", "Cancel update")
+    if change_residence is CANCEL_ACTION:
+        print("Update cancelled; no changes were saved.")
+        return False
+    residence = None
+    if change_residence == "Y":
+        residence = get_residence_details("Cancel update")
+        if residence is CANCEL_ACTION:
+            print("Update cancelled; no changes were saved.")
+            return False
+
+    if contact and not (contact.isdigit() and len(contact) >= 7):
+        print("Invalid student contact; update cancelled without saving.")
+        return False
+    if guardian_contact and not (guardian_contact.isdigit() and len(guardian_contact) >= 7):
+        print("Invalid guardian contact; update cancelled without saving.")
+        return False
     if name:
         student.full_name = name
     if new_class is not None:
@@ -954,30 +1067,29 @@ def update_student(student=None):
     if birthday:
         student.birthday = birthday
     if contact:
-        if contact.isdigit() and len(contact) >= 7:
-            student.contact_number = contact
-        else:
-            print("Invalid contact; previous value kept.")
+        student.contact_number = contact
     if guardian:
         student.guardian_name = guardian
     if guardian_contact:
-        if guardian_contact.isdigit() and len(guardian_contact) >= 7:
-            student.guardian_contact = guardian_contact
-        else:
-            print("Invalid guardian contact; previous value kept.")
-    if get_yes_or_no("Change residence type?") == "Y":
-        student.residence_type, student.intern_subtype = get_residence_details()
+        student.guardian_contact = guardian_contact
+    if residence is not None:
+        student.residence_type, student.intern_subtype = residence
     print("Student record updated.")
+    return True
 
 
 def remove_student(student=None):
     display_section_header("Remove Student")
     if student is None:
-        student = get_student_by_lookup("Student number or QR ID to remove: ")
+        student = get_student_by_lookup(
+            "Student number or QR ID to remove: ", "Back to update/remove menu"
+        )
+    if student is CANCEL_ACTION:
+        return False
     if student is None:
         return False
     print_student(student)
-    if get_yes_or_no("Remove this student?") == "Y":
+    if get_yes_or_no("Remove this student?", "Cancel removal") == "Y":
         student_records.remove(student)
         print("Student removed. Existing attendance events remain in this session.")
         return True
@@ -997,7 +1109,9 @@ def run_student_management_menu():
         if choice == "B":
             return
         prompt = "Student number or QR ID: "
-        student = get_student_by_lookup(prompt)
+        student = get_student_by_lookup(prompt, "Back to update/remove menu")
+        if student is CANCEL_ACTION:
+            continue
         if student is None:
             continue
         if choice == "1":
@@ -1020,6 +1134,9 @@ def run_program():
     while True:
         choice = display_main_menu()
         if choice == "8":
+            confirmation = get_yes_or_no("Exit the program?", "Return to main menu")
+            if confirmation != "Y":
+                continue
             print("\nThank you for using the campus recording system.")
             return
         actions[choice]()
