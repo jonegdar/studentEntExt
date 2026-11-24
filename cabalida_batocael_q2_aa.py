@@ -107,6 +107,15 @@ campus_system = CampusSystem()
 student_records = campus_system.student_records
 attendance_records = campus_system.attendance_records
 
+CLASS_OPTIONS = (
+    (7, "Diamond"), (7, "Emerald"), (7, "Ruby"),
+    (8, "Jasmin"), (8, "Sampaguita"), (8, "Waling-waling"),
+    (9, "Lithium"), (9, "Potassium"), (9, "Sodium"),
+    (10, "Gluon"), (10, "Graviton"), (10, "Muon"),
+    (11, "Polaris"), (11, "Rigel"), (11, "Sirius"),
+    (12, "Byte"), (12, "Quantum"), (12, "Qubit"),
+)
+
 
 def display_program_header():
     print("=" * 72)
@@ -155,16 +164,30 @@ def get_freshman_year():
         print("Enter a four-digit year, such as 2026.")
 
 
-def get_grade_level():
+def get_class_assignment(current=None):
+    """Choose one of the school's fixed grade-and-section combinations."""
+    print("Choose the student's grade and section:")
+    for number, (grade_level, section) in enumerate(CLASS_OPTIONS, start=1):
+        print(f"[{number}] G{grade_level} - {section}")
+    if current is not None:
+        print(f"[Enter] Keep current class (G{current[0]} - {current[1]})")
+
     while True:
-        level = input("Batch/grade level (7-12): ").strip()
-        if level in {"7", "8", "9", "10", "11", "12"}:
-            return int(level)
-        print("Enter a grade level from 7 through 12.")
+        choice = input("Class option (1-18): ").strip()
+        if not choice and current is not None:
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(CLASS_OPTIONS):
+            return CLASS_OPTIONS[int(choice) - 1]
+        print("Choose a listed class option" +
+              (" or press Enter to keep the current class." if current is not None else "."))
 
 
 def class_has_capacity(grade_level, section, exclude_student=None):
     """Enforce the stated 30-per-section and three-sections-per-grade limits."""
+    if not any(grade_level == option_grade and
+               section.strip().casefold() == option_section.casefold()
+               for option_grade, option_section in CLASS_OPTIONS):
+        return False, "Choose one of the school's preset grade-and-section options."
     active_students = [student for student in student_records
                        if student is not exclude_student]
     if exclude_student is None and len(active_students) >= 540:
@@ -219,8 +242,7 @@ def register_student():
         print("The campus capacity of 540 student records has been reached.")
         return
     full_name = get_non_empty_input("Full name: ")
-    grade_level = get_grade_level()
-    section = get_non_empty_input("Section name: ")
+    grade_level, section = get_class_assignment()
     allowed, reason = class_has_capacity(grade_level, section)
     if not allowed:
         print(reason)
@@ -542,10 +564,9 @@ def run_find_student_menu():
             return
 
         if choice == "1":
-            grade_level = get_grade_level()
-            section = get_non_empty_input("Section name: ")
+            grade_level, section = get_class_assignment()
             matches = find_students_by_class(grade_level, section)
-            title = f"Grade {grade_level}, Section {section}"
+            title = f"G{grade_level} - {section}"
         elif choice == "2":
             keyword = get_non_empty_input("Enter all or part of the student's name: ")
             matches = find_students_by_name(keyword)
@@ -754,8 +775,7 @@ def update_student():
     print("Press Enter to keep each current value.")
     print_student(student)
     name = input(f"New name [{student.full_name}]: ").strip()
-    grade = input(f"New batch/grade 7-12 [{student.grade_level}]: ").strip()
-    section = input(f"New section [{student.section}]: ").strip()
+    new_class = get_class_assignment((student.grade_level, student.section))
     birthday = input(f"New birthday [{student.birthday}]: ").strip()
     contact = input(f"New student contact [{student.contact_number}]: ").strip()
     guardian = input(f"New guardian name [{student.guardian_name}]: ").strip()
@@ -764,22 +784,12 @@ def update_student():
     ).strip()
     if name:
         student.full_name = name
-    proposed_grade = student.grade_level
-    proposed_section = student.section
-    valid_grade = not grade or grade in {"7", "8", "9", "10", "11", "12"}
-    if grade and valid_grade:
-        proposed_grade = int(grade)
-    elif grade:
-        print("Enter a grade from 7 through 12; previous value kept.")
-    if section:
-        proposed_section = section
-    if (grade or section) and valid_grade:
+    if new_class is not None:
         allowed, reason = class_has_capacity(
-            proposed_grade, proposed_section, exclude_student=student
+            new_class[0], new_class[1], exclude_student=student
         )
         if allowed:
-            student.grade_level = proposed_grade
-            student.section = proposed_section
+            student.grade_level, student.section = new_class
         else:
             print(f"Class change not applied: {reason}")
     if birthday:
