@@ -484,9 +484,6 @@ def print_attendance_record(record):
     print(f"Date/time: {record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
 
 
-RETURN_TO_EVENT_LIST = object()
-
-
 def edit_attendance_record(record):
     """Edit a recorded movement or its timestamp and refresh its notification."""
     while True:
@@ -503,14 +500,14 @@ def edit_attendance_record(record):
         if choice == "1":
             print("[1] Arriving on campus")
             print("[2] Leaving campus")
-            print("[B] Back")
+            print("[B] Back to edit menu")
             movement = get_menu_choice("Choose the corrected movement: ", {"1", "2", "B"})
             if movement == "B":
                 continue
             record.event_type = "ENTRY" if movement == "1" else "EXIT"
         else:
             while True:
-                print("[B] Back to event details")
+                print("[B] Back to edit menu")
                 value = input("New date/time (YYYY-MM-DD HH:MM:SS; Enter keeps current): ").strip()
                 if value.upper() == "B":
                     break
@@ -544,21 +541,18 @@ def view_attendance_event(record, allow_remove=True):
         display_section_header(f"Event Details | Record {record.record_id}")
         print_attendance_record(record)
         print("[1] Edit event")
-        choices = {"1", "B", "M"}
+        choices = {"1", "B"}
         if allow_remove:
             print("[2] Remove event")
             choices.add("2")
         print("[B] Back to event list")
-        print("[M] Main menu")
         choice = get_menu_choice("Choose an option: ", choices)
         if choice == "B":
-            return RETURN_TO_EVENT_LIST
-        if choice == "M":
-            return RETURN_TO_MAIN
+            return None
         if choice == "1":
             edit_attendance_record(record)
         elif choice == "2" and remove_attendance_record(record):
-            return RETURN_TO_EVENT_LIST
+            return None
 
 
 def display_parent_message(record):
@@ -577,6 +571,8 @@ def view_parent_message():
     if not attendance_records:
         display_section_header("Simulated Guardian Messages")
         print("There are no recorded guardian messages yet.")
+        print("[B] Back to main menu")
+        get_menu_choice("Choose B to return: ", {"B"})
         return
 
     newest_first = list(reversed(merge_sort(attendance_records, timestamp_key)))
@@ -586,6 +582,7 @@ def view_parent_message():
         start = page * PAGE_SIZE
         page_records = newest_first[start:start + PAGE_SIZE]
         display_section_header(f"Simulated Guardian Messages | Page {page + 1} of {total_pages}")
+        print("Choose an event to display its simulated guardian message.")
         for position, record in enumerate(page_records, start=1):
             print(f"    [{position}] {record.student_name} | {record.id_no} | "
                   f"{describe_movement(record.event_type)} | "
@@ -613,10 +610,7 @@ def view_parent_message():
         record = page_records[int(choice) - 1]
         display_parent_message(record)
         print("[B] Back to guardian messages")
-        print("[M] Main menu")
-        after_message = get_menu_choice("Choose an option: ", {"B", "M"})
-        if after_message == "M":
-            return RETURN_TO_MAIN
+        get_menu_choice("Choose B to return: ", {"B"})
 
 
 def display_daily_summary(today=None):
@@ -649,7 +643,6 @@ def display_main_menu():
     print("[8] Exit")
     return get_menu_choice("Choose an option (1-8): ", {str(i) for i in range(1, 9)})
 
-RETURN_TO_MAIN = object()
 RETURN_TO_SEARCH = object()
 CANCEL_ACTION = object()
 RETURN_TO_PREVIOUS = object()
@@ -666,16 +659,13 @@ def get_menu_choice(prompt, valid_choices):
 
 
 def prompt_calendar_date(prompt, date_format, format_hint):
-    """Read a valid date, with B to cancel and M to return to the main menu."""
+    """Read a valid date; B returns to the history-period selection."""
     while True:
-        print("[B] Back")
-        print("[M] Main menu")
+        print("[B] Back to history filters")
         raw_value = input(f"{prompt} ({format_hint}): ").strip()
         command = raw_value.upper()
         if command == "B":
             return RETURN_TO_PREVIOUS
-        if command == "M":
-            return RETURN_TO_MAIN
         try:
             return datetime.strptime(raw_value, date_format).date()
         except ValueError:
@@ -752,9 +742,7 @@ def run_find_student_menu():
             title = f"Student number matches for {keyword!r}"
             results_provider = lambda: find_students_by_number(keyword)
 
-        navigation = browse_student_results(matches, title, results_provider)
-        if navigation is RETURN_TO_MAIN:
-            return
+        browse_student_results(matches, title, results_provider)
 
 
 def browse_student_results(students, title, results_provider=None):
@@ -765,9 +753,8 @@ def browse_student_results(students, title, results_provider=None):
             display_section_header(title)
             print("No matching students were found.")
             print("[B] Back to search options")
-            print("[M] Main menu")
-            choice = get_menu_choice("Choose an option: ", {"B", "M"})
-            return RETURN_TO_MAIN if choice == "M" else None
+            get_menu_choice("Choose B to return: ", {"B"})
+            return None
         total_pages = (len(students) + PAGE_SIZE - 1) // PAGE_SIZE
         page = min(page, total_pages - 1)
         start = page * PAGE_SIZE
@@ -776,7 +763,7 @@ def browse_student_results(students, title, results_provider=None):
         for position, student in enumerate(page_students, start=1):
             print(f"    [{position}] {student.id_no} | {student.full_name} | "
                   f"Grade {student.grade_level}, {student.section}")
-        choices = {str(i) for i in range(1, len(page_students) + 1)} | {"B", "M"}
+        choices = {str(i) for i in range(1, len(page_students) + 1)} | {"B"}
         if page > 0:
             choices.add("P")
         if page + 1 < total_pages:
@@ -786,12 +773,9 @@ def browse_student_results(students, title, results_provider=None):
         if page + 1 < total_pages:
             print("[N] Next page")
         print("[B] Back to search options")
-        print("[M] Main menu")
         choice = get_menu_choice("Choose a result number or navigation option: ", choices)
         if choice == "B":
             return None
-        if choice == "M":
-            return RETURN_TO_MAIN
         if choice == "P":
             page -= 1
             continue
@@ -799,8 +783,6 @@ def browse_student_results(students, title, results_provider=None):
             page += 1
             continue
         navigation = view_student_details(page_students[int(choice) - 1])
-        if navigation is RETURN_TO_MAIN:
-            return RETURN_TO_MAIN
         if navigation is RETURN_TO_SEARCH:
             return None
         if results_provider is not None:
@@ -816,16 +798,11 @@ def view_student_details(student):
         print("[2] Update student details")
         print("[3] Remove student")
         print("[B] Back to search results")
-        print("[M] Main menu")
-        choice = get_menu_choice("Choose an option: ", {"1", "2", "3", "B", "M"})
+        choice = get_menu_choice("Choose an option: ", {"1", "2", "3", "B"})
         if choice == "B":
             return None
-        if choice == "M":
-            return RETURN_TO_MAIN
         if choice == "1":
-            navigation = run_student_history_menu(student)
-            if navigation is RETURN_TO_MAIN:
-                return RETURN_TO_MAIN
+            run_student_history_menu(student)
         elif choice == "2":
             update_student(student)
         elif remove_student(student):
@@ -873,12 +850,9 @@ def run_student_history_menu(student):
         print("[2] Choose a week (7 days starting on the selected date)")
         print("[3] Choose a calendar month")
         print("[B] Back to student details")
-        print("[M] Main menu")
-        choice = get_menu_choice("Choose a time period: ", {"1", "2", "3", "B", "M"})
+        choice = get_menu_choice("Choose a time period: ", {"1", "2", "3", "B"})
         if choice == "B":
             return None
-        if choice == "M":
-            return RETURN_TO_MAIN
 
         if choice == "1":
             selected_date = prompt_calendar_date("Date", "%Y-%m-%d", "YYYY-MM-DD")
@@ -890,15 +864,9 @@ def run_student_history_menu(student):
             selected_date = prompt_calendar_date("Month", "%Y-%m", "YYYY-MM")
             period = "month"
 
-        if selected_date is RETURN_TO_MAIN:
-            return RETURN_TO_MAIN
         if selected_date is RETURN_TO_PREVIOUS:
-            return None
-        if selected_date is None:
             continue
-        navigation = filter_student_history(student, period, selected_date)
-        if navigation is RETURN_TO_MAIN:
-            return RETURN_TO_MAIN
+        filter_student_history(student, period, selected_date)
 
 
 def browse_attendance_records(records, title, back_label="Back", sorter=merge_sort,
@@ -915,9 +883,8 @@ def browse_attendance_records(records, title, back_label="Back", sorter=merge_so
             display_section_header(title)
             print("No attendance events match this view.")
             print(f"[B] {back_label}")
-            print("[M] Main menu")
-            choice = get_menu_choice("Choose an option: ", {"B", "M"})
-            return RETURN_TO_MAIN if choice == "M" else None
+            get_menu_choice("Choose B to return: ", {"B"})
+            return None
 
         total_pages = (len(records) + PAGE_SIZE - 1) // PAGE_SIZE
         page = min(page, total_pages - 1)
@@ -928,7 +895,7 @@ def browse_attendance_records(records, title, back_label="Back", sorter=merge_so
             print(f"    [{position}] Event {record.record_id} | {record.student_name} | "
                   f"{record.id_no} | {describe_movement(record.event_type)} | "
                   f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
-        choices = {str(i) for i in range(1, len(page_records) + 1)} | {"B", "M"}
+        choices = {str(i) for i in range(1, len(page_records) + 1)} | {"B"}
         if page > 0:
             choices.add("P")
             print("[P] Previous page")
@@ -936,12 +903,9 @@ def browse_attendance_records(records, title, back_label="Back", sorter=merge_so
             choices.add("N")
             print("[N] Next page")
         print(f"[B] {back_label}")
-        print("[M] Main menu")
         choice = get_menu_choice("Choose an event number or navigation option: ", choices)
         if choice == "B":
             return None
-        if choice == "M":
-            return RETURN_TO_MAIN
         if choice == "P":
             page -= 1
             continue
@@ -949,9 +913,7 @@ def browse_attendance_records(records, title, back_label="Back", sorter=merge_so
             page += 1
             continue
 
-        navigation = view_attendance_event(page_records[int(choice) - 1], allow_remove)
-        if navigation is RETURN_TO_MAIN:
-            return RETURN_TO_MAIN
+        view_attendance_event(page_records[int(choice) - 1], allow_remove)
         records = sorter(records_provider(), timestamp_key)
         if refresh_callback is not None:
             refresh_callback()
@@ -970,7 +932,7 @@ def run_event_history_menu():
         if choice == "1":
             today = datetime.now().date()
             today_records = display_daily_summary(today)
-            navigation = browse_attendance_records(
+            browse_attendance_records(
                 today_records, "Today's Entry and Exit Events", "Back to event history options",
                 sorter=insertion_sort,
                 records_provider=lambda: [record for record in attendance_records
@@ -979,19 +941,17 @@ def run_event_history_menu():
             )
         else:
             ordered = merge_sort(attendance_records, timestamp_key)
-            navigation = browse_attendance_records(
+            browse_attendance_records(
                 ordered, "Overall Event History", "Back to event history options",
                 sorter=merge_sort, records_provider=lambda: list(attendance_records)
             )
-        if navigation is RETURN_TO_MAIN:
-            return
 
 
 def run_event_edit_menu():
-    """Open the full event list as a direct shortcut to event edits or removal."""
+    """Open the event list as a direct shortcut to editing a selected event."""
     ordered = merge_sort(attendance_records, timestamp_key)
     return browse_attendance_records(
-        ordered, "Edit Event", "Back to main menu", sorter=merge_sort,
+        ordered, "Select an Event to Edit", "Back to main menu", sorter=merge_sort,
         records_provider=lambda: list(attendance_records), allow_remove=False
     )
 
@@ -1134,7 +1094,7 @@ def run_program():
     while True:
         choice = display_main_menu()
         if choice == "8":
-            confirmation = get_yes_or_no("Exit the program?", "Return to main menu")
+            confirmation = get_yes_or_no("Exit the program?")
             if confirmation != "Y":
                 continue
             print("\nThank you for using the campus recording system.")
