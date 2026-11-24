@@ -3,16 +3,15 @@
 # Problem Fixed: Organizes student registration and campus entry/exit records.
 # Goal: Help guards, teachers, and dorm managers record and review student presence.
 # Target users: School guards and authorized school staff.
-# Features: Register, view, search, update, and remove students; record entry and
-# exit events; view simulated guardian messages and daily entry/exit summaries.
+# Features: Register, find, update, and remove students; record entry/exit events;
+# browse filtered student histories; view daily and overall event histories; and
+# view simulated guardian messages. Search results and histories are paginated.
 # Sorting and searching features:
-# - View students by grade, section, and name using Insertion Sort.
-# - Find students using Linear Search, then order matches by class with Insertion Sort.
-# - View students by id_no using Selection Sort.
-# - View all attendance events by timestamp using Merge Sort.
-# - View one student's events chronologically using Merge Sort.
+# - Find students by grade/section and name using Linear Search + Insertion Sort.
+# - Find full or partial student numbers using Linear Search + Selection Sort.
+# - View overall attendance chronologically using Merge Sort.
+# - View one student's date-filtered events chronologically using Merge Sort.
 # - View today's events by time using Insertion Sort.
-# - View each student's latest recorded campus status from this session.
 # Student details include intern/extern residence type and intern subtype; these
 # are descriptive and do not restrict or validate a student's movements.
 # IDs: id_qr is the student's prototype QR payload; id_no is 16-YYYY-NNN.
@@ -29,15 +28,15 @@
 # information describes the student but does not impose a schedule, since interns
 # and externs may make multiple trips or leave at different times.
 # The sorting functions are implemented in this file rather than using Python's
-# built-in sorting functions. The status view reflects only events entered during
-# the current run. Data is temporary, and guardian notifications
-# are displayed for the prototype but are not sent by SMS or email.
+# built-in sorting functions. Event history includes only records from the current
+# run. Data is temporary, and guardian notifications are displayed for the
+# prototype but are not sent by SMS or email.
 
 # Developers:
 # John Edgar A. Cabalida, 11 - Polaris
 # Shan Fernan Emiel F. Batocael, 11 - Sirius
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class Student:
@@ -320,56 +319,6 @@ def timestamp_key(record):
     return record.timestamp
 
 
-def display_student_list(students, title):
-    display_section_header(title)
-    if not students:
-        print("No students to display.")
-        return
-    for student in students:
-        print_student(student)
-    print("." * 68)
-    print(f"Total students: {len(students)}")
-
-
-def view_students_by_class():
-    ordered = insertion_sort(student_records, student_class_key)
-    display_student_list(ordered, "Student Directory: By Grade, Section, and Name")
-
-
-def linear_search_students(keyword):
-    """Find substring matches by scanning student records from first to last."""
-    target = keyword.casefold()
-    matches = []
-    for student in student_records:
-        searchable_text = " ".join((
-            student.id_qr, student.id_no, student.full_name,
-            str(student.grade_level), student.section, student.residence_type,
-            student.intern_subtype, student.guardian_name
-        )).casefold()
-        if target in searchable_text:
-            matches.append(student)
-    return matches
-
-
-def search_students():
-    display_section_header("Student Record Finder")
-    print("Search by student number, QR ID, name, grade, section, or residence.")
-    keyword = get_non_empty_input("Search term: ")
-    matches = linear_search_students(keyword)
-    if not matches:
-        print("No matching student was found.")
-        return
-    ordered_matches = insertion_sort(matches, student_class_key)
-    print(f"Found {len(matches)} matching student(s). Results sorted by class.")
-    for student in ordered_matches:
-        print_student(student)
-
-
-def view_students_by_id_no():
-    ordered = selection_sort(student_records, student_number_key)
-    display_student_list(ordered, "Student Directory: By Student Number")
-
-
 def build_notification(student, event_type, timestamp):
     return (
         f"Hello po, Ma'am/Sir {student.guardian_name}!\n\n"
@@ -432,42 +381,6 @@ def print_attendance_record(record):
     print(f"Date/time: {record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
 
 
-def display_attendance_list(records, title):
-    display_section_header(title)
-    if not records:
-        print("No attendance events to display.")
-        return
-    for record in records:
-        print_attendance_record(record)
-    print("." * 68)
-    print(f"Total events: {len(records)}")
-
-
-def view_all_events_chronologically():
-    ordered = merge_sort(attendance_records, timestamp_key)
-    display_attendance_list(ordered, "All Recorded Events, in Date and Time Order")
-
-
-def view_todays_events():
-    today = datetime.now().date()
-    todays_records = [record for record in attendance_records
-                      if record.timestamp.date() == today]
-    ordered = insertion_sort(todays_records, timestamp_key)
-    display_attendance_list(ordered, "Today's Entry and Exit Activity")
-
-
-def view_student_history():
-    display_section_header("Student Attendance History")
-    student = get_student_by_lookup("Student number or QR ID: ")
-    if student is None:
-        return
-    history = [record for record in attendance_records if record.id_qr == student.id_qr]
-    ordered = merge_sort(history, timestamp_key)
-    print(f"History for {student.full_name} ({student.id_no})")
-    print("Residence type is descriptive only; no travel rules are enforced.")
-    display_attendance_list(ordered, "Student Events, in Date and Time Order")
-
-
 def display_parent_message(record):
     display_section_header("Simulated Parent/Guardian Message")
     print(f"Recipient: Parent/guardian of {record.student_name}")
@@ -480,136 +393,358 @@ def display_parent_message(record):
 
 
 def view_parent_message():
+    """Browse recorded events and open the simulated guardian message for one."""
     if not attendance_records:
-        print("There are no recorded messages yet.")
+        display_section_header("Simulated Guardian Messages")
+        print("There are no recorded guardian messages yet.")
         return
-    for record in attendance_records:
-        print(f"[{record.record_id}] {record.student_name} - {describe_movement(record.event_type)} - "
-              f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
-    record_id = get_non_empty_input("Event number to open: ")
-    if not record_id.isdigit():
-        print("Enter one of the event numbers shown above.")
-        return
-    for record in attendance_records:
-        if record.record_id == int(record_id):
-            display_parent_message(record)
+
+    newest_first = list(reversed(merge_sort(attendance_records, timestamp_key)))
+    page = 0
+    total_pages = (len(newest_first) + PAGE_SIZE - 1) // PAGE_SIZE
+    while True:
+        start = page * PAGE_SIZE
+        page_records = newest_first[start:start + PAGE_SIZE]
+        display_section_header(f"Simulated Guardian Messages | Page {page + 1} of {total_pages}")
+        for position, record in enumerate(page_records, start=1):
+            print(f"[{position}] {record.student_name} | {record.id_no} | "
+                  f"{describe_movement(record.event_type)} | "
+                  f"{record.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
+        choices = {str(i) for i in range(1, len(page_records) + 1)} | {"B"}
+        if page > 0:
+            choices.add("P")
+        if page + 1 < total_pages:
+            choices.add("N")
+        navigation_labels = []
+        if page > 0:
+            navigation_labels.append("[P] Previous page")
+        if page + 1 < total_pages:
+            navigation_labels.append("[N] Next page")
+        navigation_labels.append("[B] Back to main menu")
+        print("  ".join(navigation_labels))
+        choice = get_menu_choice("Choose an event or navigation option: ", choices)
+        if choice == "B":
             return
-    print("Recording not found.")
+        if choice == "P":
+            page -= 1
+            continue
+        if choice == "N":
+            page += 1
+            continue
+
+        record = page_records[int(choice) - 1]
+        display_parent_message(record)
+        after_message = get_menu_choice(
+            "[B] Back to guardian messages  [M] Main menu: ", {"B", "M"}
+        )
+        if after_message == "M":
+            return RETURN_TO_MAIN
 
 
 def display_daily_summary():
+    """Print today's entry/exit counts and return today's events in time order."""
     today = datetime.now().date()
-    entries = sum(1 for record in attendance_records
-                  if record.timestamp.date() == today and record.event_type == "ENTRY")
-    exits = sum(1 for record in attendance_records
-                if record.timestamp.date() == today and record.event_type == "EXIT")
-    display_section_header("Daily Summary")
-    print(f"Date: {today}")
+    todays_records = [record for record in attendance_records
+                      if record.timestamp.date() == today]
+    entries = sum(1 for record in todays_records if record.event_type == "ENTRY")
+    exits = sum(1 for record in todays_records if record.event_type == "EXIT")
+    display_section_header("Today's Daily Summary")
+    print(f"Date: {today.isoformat()}")
     print(f"Total events: {entries + exits}")
     print(f"Entries: {entries}")
     print(f"Exits: {exits}")
-
-
-def view_latest_recorded_status():
-    """Show what each student's latest recorded entry or exit indicates."""
-    latest_by_id_qr = {}
-    for record in attendance_records:
-        previous = latest_by_id_qr.get(record.id_qr)
-        if previous is None or record.timestamp > previous.timestamp:
-            latest_by_id_qr[record.id_qr] = record
-
-    ordered_students = insertion_sort(student_records, student_class_key)
-    display_section_header("Latest Recorded Campus Status")
-    print("Based on each student's latest event recorded since this program started.")
-    print("Latest ENTRY means recorded as on campus. Latest EXIT means recorded as off campus.")
-    print("No event this session means the status is unknown. This is not a live location check.")
-    print("Event records are cleared when the program closes.")
-    if not ordered_students:
-        print("No students are registered.")
-        return
-
-    for student in ordered_students:
-        latest = latest_by_id_qr.get(student.id_qr)
-        print("." * 68)
-        print(f"{student.id_no} | {student.full_name} | "
-              f"Grade {student.grade_level}, {student.section}")
-        if latest is None:
-            print("Status: UNKNOWN. No entry or exit has been recorded this session.")
-        else:
-            status = "Recorded as on campus" if latest.event_type == "ENTRY" else "Recorded as off campus"
-            print(f"Status: {status}")
-            print(f"Latest event: {latest.event_type} at "
-                  f"{latest.timestamp.strftime('%Y-%m-%d %I:%M:%S %p')}")
-
-
-def get_menu_choice(prompt, valid_choices):
-    while True:
-        choice = input(prompt).strip()
-        if choice in valid_choices:
-            return choice
-        print("That choice is not on this menu. Please try again.")
+    return insertion_sort(todays_records, timestamp_key)
 
 
 def display_main_menu():
     print("\n" + "=" * 72)
     print("MAIN MENU")
     print("=" * 72)
-    print("[1] Register a student")
-    print("[2] Find a student")
-    print("[3] Student records")
-    print("[4] Record an entry or exit")
-    print("[5] Attendance and reports")
-    print("[6] Guardian messages")
-    print("[7] Exit")
-    return get_menu_choice("Choose an option (1-7): ", {str(i) for i in range(1, 8)})
+    print("[1] Register student")
+    print("[2] Find student")
+    print("[3] Update student details")
+    print("[4] Remove student")
+    print("[5] Record student entry/exit")
+    print("[6] View events history")
+    print("[7] View simulated guardian's message")
+    print("[8] Exit")
+    return get_menu_choice("Choose an option (1-8): ", {str(i) for i in range(1, 9)})
+
+RETURN_TO_MAIN = object()
+PAGE_SIZE = 10
 
 
-def run_student_records_menu():
-    actions = {"1": view_students_by_class, "2": view_students_by_id_no,
-               "3": update_student, "4": remove_student}
+def get_menu_choice(prompt, valid_choices):
+    valid = {choice.upper() for choice in valid_choices}
     while True:
-        display_section_header("Student Records")
-        print("[1] Browse students by grade and section")
-        print("[2] Browse students by student number")
-        print("[3] Update a student record")
-        print("[4] Remove a student record")
-        print("[5] Back to main menu")
-        choice = get_menu_choice("Choose an option (1-5): ", {"1", "2", "3", "4", "5"})
-        if choice == "5":
-            return
-        actions[choice]()
+        choice = input(prompt).strip().upper()
+        if choice in valid:
+            return choice
+        print("That choice is not on this menu. Please try again.")
 
 
-def run_attendance_menu():
-    actions = {"1": view_todays_events,
-               "2": view_all_events_chronologically,
-               "3": view_student_history,
-               "4": display_daily_summary,
-               "5": view_latest_recorded_status}
+def prompt_calendar_date(prompt, date_format, format_hint):
+    """Read a valid date, with B to cancel and M to return to the main menu."""
     while True:
-        display_section_header("Attendance and Reports")
-        print("[1] Today's entry and exit activity")
-        print("[2] Browse all recorded events")
-        print("[3] View one student's event history")
-        print("[4] Today's entry/exit summary")
-        print("[5] View latest recorded campus status")
-        print("[6] Back to main menu")
-        choice = get_menu_choice("Choose an option (1-6): ", {str(i) for i in range(1, 7)})
-        if choice == "6":
-            return
-        actions[choice]()
+        raw_value = input(f"{prompt} ({format_hint}; B=Back, M=Main menu): ").strip()
+        command = raw_value.upper()
+        if command == "B":
+            return None
+        if command == "M":
+            return RETURN_TO_MAIN
+        try:
+            return datetime.strptime(raw_value, date_format).date()
+        except ValueError:
+            print(f"Enter a valid date using {format_hint}.")
 
 
-def run_guardian_messages_menu():
+def find_students_by_class(grade_level, section):
+    """Use a linear scan to find students in one grade and section."""
+    matches = []
+    target_section = section.casefold()
+    for student in student_records:
+        if (student.grade_level == grade_level
+                and student.section.casefold() == target_section):
+            matches.append(student)
+    return insertion_sort(matches, student_class_key)
+
+
+def find_students_by_name(keyword):
+    """Use Linear Search for a case-insensitive partial name match."""
+    target = keyword.casefold()
+    matches = []
+    for student in student_records:
+        if target in student.full_name.casefold():
+            matches.append(student)
+    return insertion_sort(matches, student_class_key)
+
+
+def find_students_by_number(keyword):
+    """Use Linear Search for a full or partial student-number match."""
+    target = keyword.casefold()
+    matches = []
+    for student in student_records:
+        if target in student.id_no.casefold():
+            matches.append(student)
+    return selection_sort(matches, student_number_key)
+
+
+def run_find_student_menu():
+    """Offer the three student-finding paths requested for the main menu."""
     while True:
-        display_section_header("Guardian Messages")
-        print("[1] View a message for a recorded event")
-        print("[2] Back to main menu")
-        choice = get_menu_choice("Choose an option (1-2): ", {"1", "2"})
-        if choice == "2":
+        display_section_header("Find Student")
+        print("[1] Find by grade and section")
+        print("[2] Find by name")
+        print("[3] Find by student ID number")
+        print("[B] Back to main menu")
+        choice = get_menu_choice("Choose an option: ", {"1", "2", "3", "B"})
+        if choice == "B":
             return
-        view_parent_message()
 
+        if choice == "1":
+            grade_level = get_grade_level()
+            section = get_non_empty_input("Section name: ")
+            matches = find_students_by_class(grade_level, section)
+            title = f"Grade {grade_level}, Section {section}"
+        elif choice == "2":
+            keyword = get_non_empty_input("Enter all or part of the student's name: ")
+            matches = find_students_by_name(keyword)
+            title = f"Name matches for {keyword!r}"
+        else:
+            keyword = get_non_empty_input("Enter the full or partial student ID number: ")
+            matches = find_students_by_number(keyword)
+            title = f"Student number matches for {keyword!r}"
+
+        navigation = browse_student_results(matches, title)
+        if navigation is RETURN_TO_MAIN:
+            return
+
+
+def browse_student_results(students, title):
+    """Display a paginated result list and open a selected student's details."""
+    if not students:
+        display_section_header(title)
+        print("No matching students were found.")
+        choice = get_menu_choice("[B] Back to search options  [M] Main menu: ", {"B", "M"})
+        return RETURN_TO_MAIN if choice == "M" else None
+
+    page = 0
+    total_pages = (len(students) + PAGE_SIZE - 1) // PAGE_SIZE
+    while True:
+        start = page * PAGE_SIZE
+        page_students = students[start:start + PAGE_SIZE]
+        display_section_header(f"{title} | Page {page + 1} of {total_pages}")
+        for position, student in enumerate(page_students, start=1):
+            print(f"[{position}] {student.id_no} | {student.full_name} | "
+                  f"Grade {student.grade_level}, {student.section}")
+        choices = {str(i) for i in range(1, len(page_students) + 1)} | {"B", "M"}
+        if page > 0:
+            choices.add("P")
+        if page + 1 < total_pages:
+            choices.add("N")
+        navigation_labels = []
+        if page > 0:
+            navigation_labels.append("[P] Previous page")
+        if page + 1 < total_pages:
+            navigation_labels.append("[N] Next page")
+        navigation_labels.extend(("[B] Back to search options", "[M] Main menu"))
+        print("  ".join(navigation_labels))
+        choice = get_menu_choice("Choose a result number or navigation option: ", choices)
+        if choice == "B":
+            return None
+        if choice == "M":
+            return RETURN_TO_MAIN
+        if choice == "P":
+            page -= 1
+            continue
+        if choice == "N":
+            page += 1
+            continue
+        navigation = view_student_details(page_students[int(choice) - 1])
+        if navigation is RETURN_TO_MAIN:
+            return RETURN_TO_MAIN
+
+
+def view_student_details(student):
+    """Show a selected student's details and provide access to filtered history."""
+    while True:
+        display_section_header("Student Details")
+        print_student(student)
+        print("[1] View this student's event history")
+        print("[B] Back to search results  [M] Main menu")
+        choice = get_menu_choice("Choose an option: ", {"1", "B", "M"})
+        if choice == "B":
+            return None
+        if choice == "M":
+            return RETURN_TO_MAIN
+        navigation = run_student_history_menu(student)
+        if navigation is RETURN_TO_MAIN:
+            return RETURN_TO_MAIN
+
+
+def filter_student_history(student, period, selected_date):
+    """Filter one student's events for a selected day, seven-day week, or month."""
+    if period == "day":
+        start_date = selected_date
+        end_date = selected_date
+        title = f"{student.full_name}: events on {selected_date.isoformat()}"
+    elif period == "week":
+        start_date = selected_date
+        end_date = selected_date + timedelta(days=6)
+        title = (f"{student.full_name}: events from {start_date.isoformat()} "
+                 f"through {end_date.isoformat()}")
+    else:
+        start_date = selected_date
+        title = f"{student.full_name}: events for {selected_date.strftime('%B %Y')}"
+
+    matches = []
+    for record in attendance_records:
+        if record.id_qr != student.id_qr:
+            continue
+        event_date = record.timestamp.date()
+        if period == "month":
+            if event_date.year == selected_date.year and event_date.month == selected_date.month:
+                matches.append(record)
+        elif start_date <= event_date <= end_date:
+            matches.append(record)
+    return browse_attendance_records(merge_sort(matches, timestamp_key), title,
+                                     "Back to history filters")
+
+
+def run_student_history_menu(student):
+    """Choose a specific day, seven-day week, or calendar month for a student's history."""
+    while True:
+        display_section_header(f"Event History: {student.full_name}")
+        print("[1] Choose a specific day")
+        print("[2] Choose a week (7 days starting on the selected date)")
+        print("[3] Choose a calendar month")
+        print("[B] Back to student details  [M] Main menu")
+        choice = get_menu_choice("Choose a time period: ", {"1", "2", "3", "B", "M"})
+        if choice == "B":
+            return None
+        if choice == "M":
+            return RETURN_TO_MAIN
+
+        if choice == "1":
+            selected_date = prompt_calendar_date("Date", "%Y-%m-%d", "YYYY-MM-DD")
+            period = "day"
+        elif choice == "2":
+            selected_date = prompt_calendar_date("First day of the 7-day period", "%Y-%m-%d", "YYYY-MM-DD")
+            period = "week"
+        else:
+            selected_date = prompt_calendar_date("Month", "%Y-%m", "YYYY-MM")
+            period = "month"
+
+        if selected_date is RETURN_TO_MAIN:
+            return RETURN_TO_MAIN
+        if selected_date is None:
+            continue
+        navigation = filter_student_history(student, period, selected_date)
+        if navigation is RETURN_TO_MAIN:
+            return RETURN_TO_MAIN
+
+
+def browse_attendance_records(records, title, back_label="Back"):
+    """Display already-sorted event records in pages with consistent navigation."""
+    if not records:
+        display_section_header(title)
+        print("No attendance events match this view.")
+        choice = get_menu_choice(f"[B] {back_label}  [M] Main menu: ", {"B", "M"})
+        return RETURN_TO_MAIN if choice == "M" else None
+
+    page = 0
+    total_pages = (len(records) + PAGE_SIZE - 1) // PAGE_SIZE
+    while True:
+        start = page * PAGE_SIZE
+        page_records = records[start:start + PAGE_SIZE]
+        display_section_header(f"{title} | Page {page + 1} of {total_pages}")
+        for record in page_records:
+            print_attendance_record(record)
+        choices = {"B", "M"}
+        if page > 0:
+            choices.add("P")
+        if page + 1 < total_pages:
+            choices.add("N")
+        navigation_labels = []
+        if page > 0:
+            navigation_labels.append("[P] Previous page")
+        if page + 1 < total_pages:
+            navigation_labels.append("[N] Next page")
+        navigation_labels.extend((f"[B] {back_label}", "[M] Main menu"))
+        print("  ".join(navigation_labels))
+        choice = get_menu_choice("Choose a navigation option: ", choices)
+        if choice == "B":
+            return None
+        if choice == "M":
+            return RETURN_TO_MAIN
+        if choice == "P":
+            page -= 1
+        elif choice == "N":
+            page += 1
+
+
+def run_event_history_menu():
+    """Provide daily summary and overall chronological event history."""
+    while True:
+        display_section_header("View Events History")
+        print("[1] Today's daily summary and events")
+        print("[2] Overall event history")
+        print("[B] Back to main menu")
+        choice = get_menu_choice("Choose an option: ", {"1", "2", "B"})
+        if choice == "B":
+            return
+        if choice == "1":
+            today_records = display_daily_summary()
+            navigation = browse_attendance_records(
+                today_records, "Today's Entry and Exit Events", "Back to event history options"
+            )
+        else:
+            ordered = merge_sort(attendance_records, timestamp_key)
+            navigation = browse_attendance_records(
+                ordered, "Overall Event History", "Back to event history options"
+            )
+        if navigation is RETURN_TO_MAIN:
+            return
 
 def update_student():
     display_section_header("Update Student")
@@ -679,19 +814,24 @@ def remove_student():
     else:
         print("Removal cancelled.")
 
-
 def run_program():
+    """Run the single-file terminal application until the user exits."""
     display_program_header()
-    actions = {"1": register_student, "2": search_students,
-               "3": run_student_records_menu, "4": record_entry_or_exit,
-               "5": run_attendance_menu, "6": run_guardian_messages_menu}
+    actions = {
+        "1": register_student,
+        "2": run_find_student_menu,
+        "3": update_student,
+        "4": remove_student,
+        "5": record_entry_or_exit,
+        "6": run_event_history_menu,
+        "7": view_parent_message,
+    }
     while True:
         choice = display_main_menu()
-        if choice == "7":
+        if choice == "8":
             print("\nThank you for using the campus recording system.")
-            break
+            return
         actions[choice]()
-
 
 if __name__ == "__main__":
     run_program()
