@@ -125,12 +125,14 @@ CLASS_OPTIONS = (
 
 
 def display_program_header():
-    print("=" * 72)
-    print("PSHS-ZRC STUDENT ENTRANCE AND EXIT RECORDING SYSTEM")
-    print("=" * 72)
-    print("Register students and record campus entry and exit events.")
-    print("Residence information is recorded for context, not used to restrict trips.")
-    print("=" * 72)
+    header_width = 80
+    title = "PSHS-ZRC STUDENT ENTRANCE AND EXIT RECORDING SYSTEM"
+    print("=" * header_width)
+    print(f"{title:^{header_width}}")
+    print("=" * header_width)
+    print(f"{'Register students and record campus entry and exit events.':^{header_width}}")
+    print(f"{'Residence information is recorded for context, not used to restrict trips.':^{header_width}}")
+    print("=" * header_width)
 
 
 def display_section_header(title):
