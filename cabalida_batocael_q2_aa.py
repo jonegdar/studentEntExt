@@ -244,7 +244,11 @@ def get_residence_details(back_label=None):
         print("[2] Extern")
         if back_label:
             print(f"[B] {back_label}")
-        choice = input("Choose residence type: ").strip()
+        while True:
+            choice = input("Choose residence type: ").strip()
+            if choice in {"1", "2"} or (back_label and choice.upper() == "B"):
+                break
+            print("Choose 1 for Intern or 2 for Extern.")
         if back_label and choice.upper() == "B":
             return CANCEL_ACTION
         if choice == "1":
@@ -252,17 +256,19 @@ def get_residence_details(back_label=None):
                 print("[1] Weekender")
                 print("[2] Goes home Friday, returns Sunday")
                 print("[B] Back to residence type")
-                subtype = input("Choose intern type: ").strip()
+                while True:
+                    subtype = input("Choose intern type: ").strip()
+                    if subtype in {"1", "2", "B"}:
+                        break
+                    print("Choose 1 or 2.")
                 if subtype.upper() == "B":
                     break
                 if subtype == "1":
                     return "Intern", "Weekender"
                 if subtype == "2":
                     return "Intern", "Friday-home intern"
-                print("Choose 1 or 2.")
         if choice == "2":
             return "Extern", "Not applicable"
-        print("Choose 1 for Intern or 2 for Extern.")
 
 
 def create_id_qr(id_no):
