@@ -993,7 +993,7 @@ def run_event_edit_menu():
     ordered = merge_sort(attendance_records, timestamp_key)
     return browse_attendance_records(
         ordered, "Select an Event to Edit", "Back to main menu", sorter=merge_sort,
-        records_provider=lambda: list(attendance_records), allow_remove=False
+        records_provider=lambda: list(attendance_records), allow_remove=True
     )
 
 
