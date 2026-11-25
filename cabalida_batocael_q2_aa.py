@@ -545,6 +545,24 @@ def edit_attendance_record(record):
         print("Event updated.")
 
 
+def edit_attendance_timestamp(record):
+    """Change an event timestamp directly from its details screen."""
+    while True:
+        print("[B] Back to event details")
+        value = input(
+            "New date/time (YYYY-MM-DD HH:MM:SS; Enter keeps current): "
+        ).strip()
+        if value.upper() == "B" or not value:
+            return False
+        try:
+            record.timestamp = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+            record.notification = build_record_notification(record)
+            print("Event updated.")
+            return True
+        except ValueError:
+            print("Enter a valid date and time in YYYY-MM-DD HH:MM:SS format.")
+
+
 def remove_attendance_record(record):
     """Remove an event after explicit confirmation."""
     if get_yes_or_no(f"Remove event {record.record_id}?") == "Y":
@@ -560,18 +578,21 @@ def view_attendance_event(record, allow_remove=True):
     while True:
         display_section_header(f"Event Details | Record {record.record_id}")
         print_attendance_record(record)
-        print("[1] Edit event")
-        choices = {"1", "B"}
+        print("[1] Edit event (movement or date/time)")
+        print("[2] Change date and time")
+        choices = {"1", "2", "B"}
         if allow_remove:
-            print("[2] Remove event")
-            choices.add("2")
+            print("[3] Remove event")
+            choices.add("3")
         print("[B] Back to event list")
         choice = get_menu_choice("Choose an option: ", choices)
         if choice == "B":
             return None
         if choice == "1":
             edit_attendance_record(record)
-        elif choice == "2" and remove_attendance_record(record):
+        elif choice == "2":
+            edit_attendance_timestamp(record)
+        elif choice == "3" and remove_attendance_record(record):
             return None
 
 
