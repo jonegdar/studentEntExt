@@ -141,9 +141,9 @@ def display_section_header(title):
     print("-" * 72)
 
 
-def get_non_empty_input(prompt, back_label=None):
+def get_non_empty_input(prompt, back_label=None, show_back_label=True):
     while True:
-        if back_label:
+        if back_label and show_back_label:
             print(f"[B] {back_label}")
         value = input(prompt).strip()
         if back_label and value.upper() == "B":
@@ -153,9 +153,9 @@ def get_non_empty_input(prompt, back_label=None):
         print("Please enter a value. This cannot be blank.")
 
 
-def get_valid_contact(prompt, back_label=None):
+def get_valid_contact(prompt, back_label=None, show_back_label=True):
     while True:
-        if back_label:
+        if back_label and show_back_label:
             print(f"[B] {back_label}")
         value = input(prompt).strip()
         if back_label and value.upper() == "B":
@@ -180,9 +180,9 @@ def get_yes_or_no(prompt, back_label=None):
         print("Enter Y for Yes or N for No.")
 
 
-def get_freshman_year(back_label=None):
+def get_freshman_year(back_label=None, show_back_label=True):
     while True:
-        if back_label:
+        if back_label and show_back_label:
             print(f"[B] {back_label}")
         year = input("Student's freshman year: ").strip()
         if back_label and year.upper() == "B":
@@ -285,7 +285,10 @@ def register_student():
     if len(student_records) >= 540:
         print("The campus capacity of 540 student records has been reached.")
         return
-    full_name = get_non_empty_input("Full name: ", "Cancel registration")
+    print("Type B at any text prompt to cancel registration without saving.")
+    full_name = get_non_empty_input(
+        "Full name: ", "Cancel registration", show_back_label=False
+    )
     if full_name is CANCEL_ACTION:
         return
     class_assignment = get_class_assignment(back_label="Cancel registration")
@@ -296,24 +299,33 @@ def register_student():
     if not allowed:
         print(reason)
         return
-    birthday = get_non_empty_input("Birthday (YYYY-MM-DD): ", "Cancel registration")
+    birthday = get_non_empty_input(
+        "Birthday (YYYY-MM-DD): ", "Cancel registration", show_back_label=False
+    )
     if birthday is CANCEL_ACTION:
         return
-    contact_number = get_valid_contact("Student contact number: ", "Cancel registration")
+    contact_number = get_valid_contact(
+        "Student contact number: ", "Cancel registration", show_back_label=False
+    )
     if contact_number is CANCEL_ACTION:
         return
-    freshman_year = get_freshman_year("Cancel registration")
+    freshman_year = get_freshman_year(
+        "Cancel registration", show_back_label=False
+    )
     if freshman_year is CANCEL_ACTION:
         return
     residence = get_residence_details("Cancel registration")
     if residence is CANCEL_ACTION:
         return
     residence_type, intern_subtype = residence
-    guardian_name = get_non_empty_input("Parent/guardian full name: ", "Cancel registration")
+    guardian_name = get_non_empty_input(
+        "Parent/guardian full name: ", "Cancel registration", show_back_label=False
+    )
     if guardian_name is CANCEL_ACTION:
         return
     guardian_contact = get_valid_contact(
-        "Parent/guardian contact number: ", "Cancel registration"
+        "Parent/guardian contact number: ", "Cancel registration",
+        show_back_label=False
     )
     if guardian_contact is CANCEL_ACTION:
         return
